@@ -38,8 +38,6 @@ module.exports = class App extends ReadyResource {
       swarm
     })
 
-    console.log('Application storage:', pear.storage)
-
     this.pear = pear
 
     pear.on('error', (err) => this.emit('error', err))
