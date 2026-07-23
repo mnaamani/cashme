@@ -4,17 +4,18 @@
 
 End-to-end boilerplate for embedding [pear-runtime] in a standalone [Bare] CLI with peer-to-peer OTA update support.
 
-This variant runs networking, storage and updates in the CLI process without a worker or daemon.
+This variant starts a detached [`bare-daemon`][bare-daemon] updater, allowing short-lived CLI commands to exit while update checks continue in the background.
 
 - Peer-to-Peer deployment with [pear][pear-docs] CLI
 - Peer-to-Peer Over-the-Air updates with [`pear-runtime`][pear-runtime] module
+- Detached updater process via [`bare-daemon`][bare-daemon]
 - Cross-platform standalone distributables via [`bare-build`][bare-build]
 
 ## Variants
 
 - [`main`](https://github.com/holepunchto/hello-pear-bare/tree/main): runs `pear-runtime` in a Bare worker and communicates over framed IPC.
-- (current) [`single-thread`](https://github.com/holepunchto/hello-pear-bare/tree/variant/single-thread): runs `pear-runtime` directly in the CLI process.
-- [`daemon`](https://github.com/holepunchto/hello-pear-bare/tree/variant/daemon): runs `pear-runtime` in a detached updater daemon.
+- [`single-thread`](https://github.com/holepunchto/hello-pear-bare/tree/variant/single-thread): runs `pear-runtime` directly in the CLI process.
+- (current) [`daemon`](https://github.com/holepunchto/hello-pear-bare/tree/variant/daemon): runs `pear-runtime` in a detached updater daemon.
 
 ## Table of Contents
 
@@ -80,15 +81,23 @@ Enable updates for local flow testing:
 npm start -- --updates
 ```
 
+Set how long the daemon waits for an update:
+
+```sh
+npm start -- --updates --update-window 60000
+```
+
+Development runs are unbundled, so they exercise the daemon lifecycle without replacing the local Bare executable. Updates are applied by standalone builds.
+
 ## Architecture
 
 ### Runtime Model
 
-The `App` resource creates `Corestore`, `Hyperswarm` and `PearRuntime` directly in the CLI process. Their lifecycle is tied to the foreground command.
+The foreground CLI uses `bare-daemon` to start itself in hidden updater mode. The updater process owns `Corestore`, `Hyperswarm` and `PearRuntime`; an `updater.lock` file ensures only one updater runs per storage directory.
 
 ### Updates
 
-The `App` resource consumes the `upgrade` link from `package.json`, joins the updater drive and applies downloaded updates in the foreground process.
+The updater consumes the `upgrade` link from `package.json`, joins the updater drive and applies downloaded updates in the background. It waits 30 seconds by default, remains alive when a download starts and exits after an update is applied or an error occurs. Output is written to `<storage>/updates.log`.
 
 Per-run disable updates:
 
@@ -129,7 +138,7 @@ npx pear-install pear://<key>
 ## Project Structure
 
 - `bin.mjs` - CLI entrypoint and runtime wiring
-- `app.js` - in-process updater resource
+- `app.js` - daemon launcher and updater resource
 - `scripts/make.js` - platform/arch build target selector
 - `test/index.js` - brittle-bare tests
 
@@ -137,12 +146,14 @@ npx pear-install pear://<key>
 
 - `INVALID_URL: Invalid URL 'pear://<YOUR_KEY_HERE>'` means updates were enabled before the placeholder `upgrade` link in `package.json` was replaced. Run `pear touch`, then put the generated `pear://...` link in `package.json`.
 - If updates do not trigger, verify `package.json` contains a valid `upgrade` Pear link and that peers are seeding the target drive.
+- Check `<storage>/updates.log` for daemon startup and updater errors.
 - If `npm run make` fails on unsupported hosts, run a specific `make:<platform>-<arch>` script or build on a supported host.
 - This template does not implement app-level data persistence; it is a minimal CLI + updater example.
 
 <!-- Reference Links -->
 
 [pear-docs]: https://docs.pears.com
+[bare-daemon]: https://github.com/holepunchto/bare-daemon
 [pear-runtime]: https://github.com/holepunchto/pear-runtime
 [Bare]: https://github.com/holepunchto/bare
 [nodejs]: https://nodejs.org
