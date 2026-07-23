@@ -157,6 +157,7 @@ module.exports = class App extends ReadyResource {
 
     this.once('update-applied', complete)
     this.once('error', complete)
+    this.once('close', complete)
 
     try {
       await this.ready()
@@ -167,6 +168,7 @@ module.exports = class App extends ReadyResource {
     } finally {
       this.removeListener('update-applied', complete)
       this.removeListener('error', complete)
+      this.removeListener('close', complete)
     }
   }
 
