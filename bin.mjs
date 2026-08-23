@@ -10,6 +10,7 @@ import pkg from './package.json'
 import App from './app.js'
 import DHT from 'hyperdht'
 import HttpBridgeClient from '@dhttp/client'
+import 'bare-crypto/global'
 
 // cashu-ts needs global fetch and TextEncoder APIs
 import { TextEncoder } from 'text-encoding'
