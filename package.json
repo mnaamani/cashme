@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@cashu/cashu-ts": "^4.9.0",
+    "@dhttp/client": "^0.0.0-rc.4",
     "bare-console": "^6.2.0",
     "bare-daemon": "^1.2.4",
     "bare-fetch": "^3.2.0",

@@ -8,14 +8,15 @@ import FileLog from 'bare-file-logger'
 import Console from 'bare-console'
 import pkg from './package.json'
 import App from './app.js'
+import DHT from 'hyperdht'
+import HttpBridgeClient from '@dhttp/client'
 
 // cashu-ts needs global fetch and TextEncoder APIs
 import { TextEncoder } from 'text-encoding'
 globalThis.TextEncoder = TextEncoder
-// keep this for initial testing/wiring wallet
-// We will rely on @dhttp/client to create a custom transport and pass as `requestFetch` wallet option
-import fetch from 'bare-fetch'
-globalThis.fetch = fetch
+
+import bareFetch from 'bare-fetch'
+globalThis.fetch = bareFetch
 // import wallet only after setting TextEncoder and fetch on globalThis
 import { Wallet } from '@cashu/cashu-ts'
 
@@ -66,13 +67,37 @@ if (updates !== false) {
   }
 }
 
-console.log('\nCLI ready.\n')
+const testnutBridgeKey = '72c402ee132faddfc8d24141daeed4c91fe5f7ce873d49095f6225330a7b8ba7'
+const dht = new DHT()
+const dhttpclient = new HttpBridgeClient(dht.connect(testnutBridgeKey))
 
-// Test Cashu wallet works in bare + pear app
-const mintUrl = 'https://testnut.cashu.space'
-const wallet1 = new Wallet(mintUrl) // unit is 'sat'
+const { upstream } = await dhttpclient.info()
+console.log('Connected to mint bridge', testnutBridgeKey)
+console.log('Bridge Upstream:', upstream)
+
+// now swapout global fetch for the client's fetch, not this means any other part of the app
+// that uses global fetch will be talking to the mint!
+globalThis.fetch = dhttpclient.fetch()
+
+// The real mint url is the upstream the bridge connects to. Passing a different
+// url to the Wallet constructor doesn't change the destination
+// const mintUrl = 'https://testnut.cashu.space'
+const wallet1 = new Wallet('https://nowhere.invalid', {
+  // These custom transport options don't seem to be working..why?
+  // requestFetch: dhttpclient.fetch(),
+  // customRequest: dhttpclient.fetch(),
+  // OpenId Authentication - needs to reach 'normal' internet, can't use the global fetch
+  // we have overriden to call the mint.
+  oidc: {
+    fetch: bareFetch
+  },
+  unit: 'sat'
+})
 await wallet1.loadMint() // wallet is now ready to use
 console.log('Wallet Ready.\n')
+
+dhttpclient.destroy()
+await dht.destroy()
 
 async function runUpdater(dir, wait) {
   const app = new App({
