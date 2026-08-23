@@ -9,6 +9,16 @@ import Console from 'bare-console'
 import pkg from './package.json'
 import App from './app.js'
 
+// cashu-ts needs global fetch and TextEncoder APIs
+import { TextEncoder } from 'text-encoding'
+globalThis.TextEncoder = TextEncoder
+// keep this for initial testing/wiring wallet
+// We will rely on @dhttp/client to create a custom transport and pass as `requestFetch` wallet option
+import fetch from 'bare-fetch'
+globalThis.fetch = fetch
+// import wallet only after setting TextEncoder and fetch on globalThis
+import { Wallet } from '@cashu/cashu-ts'
+
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0], path.extname(Bare.argv[0])) === 'bare'
 
@@ -57,6 +67,12 @@ if (updates !== false) {
 }
 
 console.log('\nCLI ready.\n')
+
+// Test Cashu wallet works in bare + pear app
+const mintUrl = 'https://testnut.cashu.space'
+const wallet1 = new Wallet(mintUrl) // unit is 'sat'
+await wallet1.loadMint() // wallet is now ready to use
+console.log('Wallet Ready.\n')
 
 async function runUpdater(dir, wait) {
   const app = new App({
