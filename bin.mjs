@@ -8,20 +8,22 @@ import FileLog from 'bare-file-logger'
 import Console from 'bare-console'
 import pkg from './package.json'
 import App from './app.js'
+import { sendToken, receiveToken } from './lib/ble.mjs'
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0], path.extname(Bare.argv[0])) === 'bare'
 
 const deposit = command(
   'deposit',
-  description('Deposit ecash into our wallet, by paying a lightning invoice (BOLT11 mint)')
+  description('Deposit new ecash into our wallet, with a lightning invoice payment (BOLT11 mint)')
 )
 const give = command('give', description('Send ecash to a neighbour over bluetooth swarm'))
 const get = command('get', description('Receive ecash from a neighbour over bluetooth swarm'))
 const withdraw = command(
   'withdraw',
-  description('Withdraw ecash from our wallet with lightning invoice payment (BOLT11 melt)')
+  description('Withdraw ecash from our wallet with a lightning invoice payment (BOLT11 melt)')
 )
+const balance = command('balance', description('Display our ecash balance'))
 const cmd = command(
   appName,
   summary(pkg.description),
@@ -30,6 +32,7 @@ const cmd = command(
   flag('--no-updates', 'disable OTA updates for this run'),
   flag('--update-window <ms>', 'updater wait in milliseconds'),
   flag('--updater', 'run updater daemon').hide(),
+  balance,
   deposit,
   give,
   get,
@@ -117,3 +120,44 @@ function updateWindow(value) {
   }
   return wait
 }
+
+async function handleCommands(cmd) {
+  if (cmd.current.name === balance.name) {
+    // parse proofs and add up the amounts, display total.
+    not_implemented(cmd)
+  }
+
+  if (cmd.current.name === give.name) {
+    // connect to ble-swarm
+    // list available peers, pick one to send to
+
+    // update proof store
+    // show new balance
+    await sendToken(cmd.flags.pubkey, Buffer.from('1000 sats'))
+  }
+
+  if (cmd.current.name === get.name) {
+    // connect to ble-swarm
+    // wait for someone to connect to us and give us a token
+    // swapt it and add to our proof store
+    // show new balance
+    // exit
+    const token = await receiveToken()
+    console.log(token)
+  }
+
+  if (cmd.current.name === deposit.name) {
+    //
+    not_implemented(cmd)
+  }
+
+  if (cmd.current.name === withdraw.name) {
+    not_implemented(cmd)
+  }
+}
+
+function not_implemented(cmd) {
+  throw new Error(`${cmd.current.name} NOT_IMPLEMENTED`)
+}
+
+await handleCommands(cmd)
