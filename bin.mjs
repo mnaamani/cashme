@@ -1,3 +1,4 @@
+import './lib/polyfills.mjs'
 import { command, flag, summary, description } from 'paparam'
 import { persistent } from 'bare-storage'
 import process from 'bare-process'
@@ -9,6 +10,8 @@ import Console from 'bare-console'
 import pkg from './package.json'
 import App from './app.js'
 import { sendToken, receiveToken } from './lib/ble.mjs'
+import { loadProofs } from './lib/proofs.mjs'
+import { sumProofs } from '@cashu/cashu-ts'
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0], path.extname(Bare.argv[0])) === 'bare'
@@ -128,7 +131,8 @@ function updateWindow(value) {
 async function handleCommands(cmd) {
   if (cmd.current.name === balance.name) {
     // parse proofs and add up the amounts, display total.
-    not_implemented(cmd)
+    const proofs = loadProofs(dir)
+    console.log('Balance:', sumProofs(proofs).toNumber())
   }
 
   if (cmd.current.name === give.name) {
