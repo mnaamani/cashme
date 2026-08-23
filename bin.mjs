@@ -137,7 +137,7 @@ async function handleCommands(cmd) {
 
     // update proof store
     // show new balance
-    await sendToken(give.flags.publicKey, Buffer.from('1000 sats'))
+    await sendToken(give.flags.publicKey, '1000 sats')
   }
 
   if (cmd.current.name === get.name) {
