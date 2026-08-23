@@ -38,6 +38,7 @@
     "paparam": "^1.10.1",
     "pear-runtime": "^1.1.4",
     "ready-resource": "^1.2.0",
+    "sleep-promise": "^9.1.0",
     "text-encoding": "^0.7.0",
     "which-runtime": "^1.4.0"
   },
