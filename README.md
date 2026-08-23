@@ -8,7 +8,7 @@
 
 run
 
-`cashme`
+`cashme --help`
 
 ## Development
 

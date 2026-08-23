@@ -130,6 +130,11 @@ function updateWindow(value) {
 }
 
 async function handleCommands(cmd) {
+  if (!cmd.current) {
+    console.log(cmd.help())
+    return
+  }
+
   if (cmd.current.name === balance.name) {
     // parse proofs and add up the amounts, display total.
     const myProofs = loadProofs(dir)

@@ -1,7 +1,7 @@
 {
   "name": "cashme",
   "version": "0.0.0-rc.0",
-  "description": "Pear Runtime CLI boilerplate using Bare with OTA updater support.",
+  "description": "Cashu wallet as a standalone Bare process on Pear, with OTA updater support.",
   "private": true,
   "bin": "bin.mjs",
   "upgrade": "pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o",
@@ -34,6 +34,7 @@
     "compact-encoding": "^3.0.0",
     "corestore": "^7.9.2",
     "fs-native-extensions": "^1.5.0",
+    "hypercore-crypto": "^3.7.0",
     "hyperdht": "^6.33.2",
     "hyperswarm": "^4.17.0",
     "paparam": "^1.10.1",
