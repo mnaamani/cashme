@@ -10,8 +10,9 @@ import Console from 'bare-console'
 import pkg from './package.json'
 import App from './app.js'
 import { sendToken, receiveToken } from './lib/ble.mjs'
-import { loadProofs } from './lib/proofs.mjs'
+import { loadProofs, saveProofs } from './lib/proofs.mjs'
 import { sumProofs } from '@cashu/cashu-ts'
+import { openWallet, mintTokens } from './lib/wallet.mjs'
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0], path.extname(Bare.argv[0])) === 'bare'
@@ -131,8 +132,8 @@ function updateWindow(value) {
 async function handleCommands(cmd) {
   if (cmd.current.name === balance.name) {
     // parse proofs and add up the amounts, display total.
-    const proofs = loadProofs(dir)
-    console.log('Balance:', sumProofs(proofs).toNumber())
+    const myProofs = loadProofs(dir)
+    console.log('Balance:', sumProofs(myProofs).toNumber())
   }
 
   if (cmd.current.name === give.name) {
@@ -141,7 +142,7 @@ async function handleCommands(cmd) {
 
     // update proof store
     // show new balance
-    const tokenString = ''
+    const tokenString = '...'
     await sendToken(give.flags.publicKey, tokenString)
   }
 
@@ -155,8 +156,13 @@ async function handleCommands(cmd) {
   }
 
   if (cmd.current.name === deposit.name) {
-    //
-    not_implemented(cmd)
+    const myProofs = loadProofs(dir)
+    const { wallet, disconnect } = await openWallet()
+    const newProofs = await mintTokens(wallet, 32)
+    const finalProofs = myProofs.concat(newProofs)
+    saveProofs(dir, finalProofs)
+    console.log('New Balance:', sumProofs(finalProofs).toNumber())
+    await disconnect()
   }
 
   if (cmd.current.name === withdraw.name) {
