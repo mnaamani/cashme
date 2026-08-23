@@ -1,4 +1,4 @@
-# hello-pear-bare
+# cashme
 
 > Pear Hello World for Standalone Bare Processes with `pear-runtime`
 
@@ -43,6 +43,7 @@ This variant is for providing P2P OTA updates to short-lived CLI programs. It us
 
 - `npm` via [Node.js][nodejs]
 - [pear][pear-docs] - `npx pear`
+- macosx
 
 ## Development
 
