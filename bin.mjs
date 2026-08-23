@@ -137,7 +137,8 @@ async function handleCommands(cmd) {
 
     // update proof store
     // show new balance
-    await sendToken(give.flags.publicKey, '1000 sats')
+    const tokenString = ''
+    await sendToken(give.flags.publicKey, tokenString)
   }
 
   if (cmd.current.name === get.name) {
@@ -146,8 +147,7 @@ async function handleCommands(cmd) {
     // swapt it and add to our proof store
     // show new balance
     // exit
-    const token = await receiveToken()
-    console.log(token)
+    const tokenString = await receiveToken()
   }
 
   if (cmd.current.name === deposit.name) {
