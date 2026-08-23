@@ -17,7 +17,11 @@ const deposit = command(
   'deposit',
   description('Deposit new ecash into our wallet, with a lightning invoice payment (BOLT11 mint)')
 )
-const give = command('give', description('Send ecash to a neighbour over bluetooth swarm'))
+const give = command(
+  'give',
+  description('Send ecash to a neighbour over bluetooth swarm'),
+  flag('--public-key|-k <pubkey>', 'full or partial public key of neighbour')
+)
 const get = command('get', description('Receive ecash from a neighbour over bluetooth swarm'))
 const withdraw = command(
   'withdraw',
@@ -133,7 +137,7 @@ async function handleCommands(cmd) {
 
     // update proof store
     // show new balance
-    await sendToken(cmd.flags.pubkey, Buffer.from('1000 sats'))
+    await sendToken(give.flags.publicKey, Buffer.from('1000 sats'))
   }
 
   if (cmd.current.name === get.name) {
