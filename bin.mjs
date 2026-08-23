@@ -18,7 +18,7 @@ globalThis.TextEncoder = TextEncoder
 import bareFetch from 'bare-fetch'
 globalThis.fetch = bareFetch
 // import wallet only after setting TextEncoder and fetch on globalThis
-import { Wallet } from '@cashu/cashu-ts'
+import { Wallet, MintQuoteState } from '@cashu/cashu-ts'
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0], path.extname(Bare.argv[0])) === 'bare'
@@ -72,8 +72,8 @@ const dht = new DHT()
 const dhttpclient = new HttpBridgeClient(dht.connect(testnutBridgeKey))
 
 const { upstream } = await dhttpclient.info()
-console.log('Connected to mint bridge', testnutBridgeKey)
-console.log('Bridge Upstream:', upstream)
+console.log('Connected to mint bridge:', testnutBridgeKey)
+console.log('Upstream:', upstream)
 
 // now swapout global fetch for the client's fetch, not this means any other part of the app
 // that uses global fetch will be talking to the mint!
@@ -82,7 +82,7 @@ globalThis.fetch = dhttpclient.fetch()
 // The real mint url is the upstream the bridge connects to. Passing a different
 // url to the Wallet constructor doesn't change the destination
 // const mintUrl = 'https://testnut.cashu.space'
-const wallet1 = new Wallet('https://nowhere.invalid', {
+const wallet = new Wallet('https://nowhere.invalid', {
   // These custom transport options don't seem to be working..why?
   // requestFetch: dhttpclient.fetch(),
   // customRequest: dhttpclient.fetch(),
@@ -93,8 +93,12 @@ const wallet1 = new Wallet('https://nowhere.invalid', {
   },
   unit: 'sat'
 })
-await wallet1.loadMint() // wallet is now ready to use
+await wallet.loadMint() // wallet is now ready to use
+const mintInfo = wallet.getMintInfo()
 console.log('Wallet Ready.\n')
+console.log(`${mintInfo.name} - ${mintInfo.description}`)
+
+await mintTokens(10)
 
 dhttpclient.destroy()
 await dht.destroy()
@@ -145,4 +149,22 @@ function updateWindow(value) {
     throw new Error('--update-window must be a non-negative integer')
   }
   return wait
+}
+
+async function mintTokens(amount) {
+  console.log(`minting ${amount} tokens`)
+  const mintQuote = await wallet.createMintQuoteBolt11(amount)
+  console.log('invoice', mintQuote)
+  // when using the testnut mint, the bolt11 invoice should be automatically paid on the mint side
+  await sleepSeconds(5)
+  const mintQuoteChecked = await wallet.checkMintQuoteBolt11(mintQuote.quote)
+  console.log(`invoice state: ${mintQuoteChecked.state}`)
+  if (mintQuoteChecked.state === MintQuoteState.PAID) {
+    const proofs = await wallet.mintProofsBolt11(amount, mintQuote.quote)
+    console.log(JSON.stringify(proofs)) // howto safely store the proofs?
+  }
+}
+
+function sleepSeconds(seconds) {
+  return new Promise((resolve) => setTimeout(resolve, seconds * 1000))
 }
