@@ -170,11 +170,11 @@ async function handleCommands(cmd) {
     const send = await findNeighbour(pubKey)
     const { wallet } = await openWallet()
     const { token, keep } = await generateTokenToSend(wallet, amount, myProofs)
+    saveProofs(dir, keep)
+    console.log('Remaining Balance:', sumProofs(keep).toNumber())
     // we can only use send once, so send everything in one shot,
     // the connection is severed after that, and there is no ACK
     send(token)
-    saveProofs(keep)
-    console.log('Remaining Balance:', sumProofs(keep).toNumber())
   }
 
   if (cmd.current.name === get.name) {
@@ -189,7 +189,7 @@ async function handleCommands(cmd) {
     const { wallet } = await openWallet()
     const receivedProofs = await processToken(wallet, tokenString)
     const finalProofs = myProofs.concat(receivedProofs)
-    saveProofs(finalProofs)
+    saveProofs(dir, finalProofs)
     console.log('New Balance:', sumProofs(finalProofs).toNumber())
   }
 
