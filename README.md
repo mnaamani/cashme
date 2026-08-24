@@ -1,14 +1,16 @@
-# cashme
+# cashme .... if you can
 
-> Pear Hello World for Standalone Bare Processes with `pear-runtime`
+> terminal based cashu wallet, sends and receives tokens over bluetooth low energy (BLE) swarm.
 
-# Install
+## Install
 
 `pear install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o`
 
-run
+## Run
 
 `cashme --help`
+
+## Usage
 
 ## Development
 
@@ -62,10 +64,10 @@ Set the `upgrade` field in `package.json` to your distribution drive link, then 
 
 ## Installing Distributables
 
-Once the `pear://<key>` upgrade link is seeding the build deployment folder the standalone binary can be installed peer-to-peer directly onto the system with Pear:
+Once the `pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o` upgrade link is seeding the build deployment folder the standalone binary can be installed peer-to-peer directly onto the system with Pear:
 
 ```sh
-npx pear-install pear://<key>
+npx pear-install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
 ```
 
 ## Scripts
@@ -88,20 +90,3 @@ npx pear-install pear://<key>
 - `app.js` - daemon launcher and updater resource
 - `scripts/make.js` - platform/arch build target selector
 - `test/index.js` - brittle-bare tests
-
-## Troubleshooting
-
-- `INVALID_URL: Invalid URL 'pear://<YOUR_KEY_HERE>'` means the placeholder `upgrade` link in `package.json` has not been replaced. Run `pear touch`, then put the generated `pear://...` link in `package.json`.
-- If updates do not trigger, verify `package.json` contains a valid `upgrade` Pear link and that peers are seeding the target drive.
-- Check `<storage>/updates.log` for daemon startup and updater errors.
-- If `npm run make` fails on unsupported hosts, run a specific `make:<platform>-<arch>` script or build on a supported host.
-- This template does not implement app-level data persistence; it is a minimal CLI + updater example.
-
-<!-- Reference Links -->
-
-[pear-docs]: https://docs.pears.com
-[bare-daemon]: https://github.com/holepunchto/bare-daemon
-[pear-runtime]: https://github.com/holepunchto/pear-runtime
-[Bare]: https://github.com/holepunchto/bare
-[nodejs]: https://nodejs.org
-[bare-build]: https://github.com/holepunchto/bare-build
