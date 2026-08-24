@@ -12,7 +12,7 @@ import App from './app.js'
 import { findNeighbour, receiveToken } from './lib/ble.mjs'
 import { loadProofs, saveProofs } from './lib/proofs.mjs'
 import { sumProofs } from '@cashu/cashu-ts'
-import { openWallet, mintTokens } from './lib/wallet.mjs'
+import { openWallet, mintTokens, processToken, generateTokenToSend } from './lib/wallet.mjs'
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0], path.extname(Bare.argv[0])) === 'bare'
@@ -151,11 +151,23 @@ async function handleCommands(cmd) {
     }
     // we don't send the payload until we find the neighbour
     // to keep proof management simple
+    const myProofs = loadProofs(dir)
+    const currentBalance = sumProofs(myProofs).toNumber()
+    console.log('Current Balance:', currentBalance)
+    const amount = 4 // get from flag or prompt
+    if (amount > currentBalance) {
+      console.log('Insufficient balance')
+      return
+    }
     const send = await findNeighbour(pubKey)
-    const tokenString = 'hello ble world'
-    // we can only use send onetime, so send everything at once.
-    // the connection is severed after that, and there is no ack
-    send(tokenString)
+    const { wallet, disconnect } = await openWallet()
+    const { token, keep } = await generateTokenToSend(wallet, amount, myProofs)
+    // we can only use send once, so send everything in one shot,
+    // the connection is severed after that, and there is no ACK
+    send(token)
+    saveProofs(keep)
+    console.log('Remaining Balance:', sumProofs(keep).toNumber())
+    await disconnect()
   }
 
   if (cmd.current.name === get.name) {
@@ -165,8 +177,14 @@ async function handleCommands(cmd) {
     // show new balance
     // exit
     const tokenString = await receiveToken()
-    // process tokenString..
-    // confirm step
+    const myProofs = loadProofs(dir)
+    // confirm step?
+    const { wallet, disconnect } = await openWallet()
+    const receivedProofs = await processToken(wallet, tokenString)
+    const finalProofs = myProofs.concat(receivedProofs)
+    saveProofs(finalProofs)
+    console.log('New Balance:', sumProofs(finalProofs).toNumber())
+    await disconnect()
   }
 
   if (cmd.current.name === deposit.name) {
