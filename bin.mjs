@@ -9,7 +9,7 @@ import FileLog from 'bare-file-logger'
 import Console from 'bare-console'
 import pkg from './package.json'
 import App from './app.js'
-import { sendToken, receiveToken } from './lib/ble.mjs'
+import { findNeighbour, receiveToken } from './lib/ble.mjs'
 import { loadProofs, saveProofs } from './lib/proofs.mjs'
 import { sumProofs } from '@cashu/cashu-ts'
 import { openWallet, mintTokens } from './lib/wallet.mjs'
@@ -27,9 +27,9 @@ const give = command(
   flag('--public-key|-k <pubkey>', 'full or partial public key of neighbour')
 )
 const get = command('get', description('Receive ecash from a neighbour over bluetooth swarm'))
-const withdraw = command(
-  'withdraw',
-  description('Withdraw ecash from our wallet with a lightning invoice payment (BOLT11 melt)')
+const pay = command(
+  'pay',
+  description('Use ecash from our wallet to pay a lightning invoice (BOLT11 melt)')
 )
 const balance = command('balance', description('Display our ecash balance'))
 const cmd = command(
@@ -44,7 +44,7 @@ const cmd = command(
   deposit,
   give,
   get,
-  withdraw
+  pay
 )
 
 cmd.parse(Bare.argv.slice(isDev ? 2 : 1))
@@ -147,8 +147,18 @@ async function handleCommands(cmd) {
 
     // update proof store
     // show new balance
-    const tokenString = '...'
-    await sendToken(give.flags.publicKey, tokenString)
+    const pubKey = give.flags.publicKey
+    if (!pubKey) {
+      console.log(give.help())
+      return
+    }
+    // we don't send the payload until we find the neighbour
+    // to keep proof management simple
+    const send = await findNeighbour(pubKey)
+    const tokenString = 'hello ble world'
+    // we can only use send onetime, so send everything at once.
+    // the connection is severed after that, and there is no ack
+    send(tokenString)
   }
 
   if (cmd.current.name === get.name) {
@@ -158,6 +168,8 @@ async function handleCommands(cmd) {
     // show new balance
     // exit
     const tokenString = await receiveToken()
+    // process tokenString..
+    // confirm step
   }
 
   if (cmd.current.name === deposit.name) {
@@ -170,7 +182,8 @@ async function handleCommands(cmd) {
     await disconnect()
   }
 
-  if (cmd.current.name === withdraw.name) {
+  if (cmd.current.name === pay.name) {
+    // make sure to add a confirm step
     not_implemented(cmd)
   }
 }
