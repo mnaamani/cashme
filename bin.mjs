@@ -11,7 +11,7 @@ import pkg from './package.json'
 import App from './app.js'
 import { findNeighbour, receiveToken } from './lib/ble.mjs'
 import { loadProofs, saveProofs } from './lib/proofs.mjs'
-import { sumProofs } from '@cashu/cashu-ts'
+import { sumProofs, Amount } from '@cashu/cashu-ts'
 import { openWallet, mintTokens, processToken, generateTokenToSend } from './lib/wallet.mjs'
 
 const appName = pkg.productName || pkg.name
@@ -28,7 +28,8 @@ const deposit = command(
 const give = command(
   'give',
   description('Send ecash to a neighbour over bluetooth'),
-  flag('--public-key|-k <pubkey>', 'full or partial public key of neighbour')
+  flag('--public-key|-k <pubkey>', 'full or partial public key of neighbour'),
+  flag('--sats|-s <amount>', 'number of sats to give (excluding mint fees)')
 )
 const get = command('get', description('Receive ecash from a neighbour over bluetooth'))
 const pay = command('pay', description('Pay a lightning invoice with our ecash (BOLT11 melt)'))
@@ -72,6 +73,7 @@ if (cmd.flags.updater) {
 }
 
 console.log(`Updates: ${updates === false ? 'disabled' : 'enabled'}`)
+console.log(`Storage path: ${dir}`)
 
 if (updates !== false) {
   try {
@@ -153,13 +155,15 @@ async function handleCommands(cmd) {
       console.log(give.help())
       return
     }
+
+    const amount = Amount.from(give.flags.sats)
     // we don't send the payload until we find the neighbour
     // to keep proof management simple
     const myProofs = loadProofs(dir)
     const currentBalance = sumProofs(myProofs).toNumber()
     console.log('Current Balance:', currentBalance)
-    const amount = 4 // get from flag or prompt
-    if (amount > currentBalance) {
+
+    if (amount.greaterThan(currentBalance)) {
       console.log('Insufficient balance')
       return
     }
