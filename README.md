@@ -1,10 +1,21 @@
 # cashme .... if you can
 
-> terminal based cashu wallet, sends and receives tokens over bluetooth low energy (BLE) swarm.
+> cashu wallet in your terminal, send and receive tokens over bluetooth.
+
+## EXPERIMENTAL - Use at your own risk !!
 
 ## Install
 
-`pear install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o`
+```sh
+npm -g install pear
+pear install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
+```
+
+or
+
+```sh
+npx pear-install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o`
+```
 
 ## Run
 
@@ -48,6 +59,8 @@ Run `cashme <command> --help` for details on any command, or `cashme --help` for
 
 ## Development
 
+Built on pear-runtime, [hello-pear-bare](https://github.com/holepunchto/hello-pear-bare/tree/variant/daemon) daemon variant.
+
 ### Install Dependencies
 
 ```sh
@@ -86,22 +99,6 @@ Per-run disable updates:
 
 ```sh
 npm start -- --no-updates
-```
-
-## Peer-to-Peer Deployments
-
-Use the [`pear`][pear-docs] CLI to deploy applications.
-
-Set the `upgrade` field in `package.json` to your distribution drive link, then follow the default flow from section 4 onward:
-
-[hello-pear-electron: 4. Build Deployment Directory and onward](https://github.com/holepunchto/hello-pear-electron#4-build-deployment-directory-)
-
-## Installing Distributables
-
-Once the `pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o` upgrade link is seeding the build deployment folder the standalone binary can be installed peer-to-peer directly onto the system with Pear:
-
-```sh
-npx pear-install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
 ```
 
 ## Scripts
