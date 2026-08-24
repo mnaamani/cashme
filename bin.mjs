@@ -23,7 +23,8 @@ const isDev = path.basename(Bare.argv[0], path.extname(Bare.argv[0])) === 'bare'
 
 const deposit = command(
   'deposit',
-  description('Deposit new ecash into our wallet, with a lightning invoice payment (BOLT11 mint)')
+  description('Deposit new ecash into our wallet, with a lightning invoice payment (BOLT11 mint)'),
+  flag('--sats|-s <amount>', 'number of sats to deposit')
 )
 const give = command(
   'give',
@@ -145,11 +146,6 @@ async function handleCommands(cmd) {
   }
 
   if (cmd.current.name === give.name) {
-    // connect to ble-swarm
-    // list available peers, pick one to send to
-
-    // update proof store
-    // show new balance
     const pubKey = give.flags.publicKey
     if (!pubKey) {
       console.log(give.help())
@@ -157,8 +153,6 @@ async function handleCommands(cmd) {
     }
 
     const amount = Amount.from(give.flags.sats)
-    // we don't send the payload until we find the neighbour
-    // to keep proof management simple
     const myProofs = loadProofs(dir)
     const currentBalance = sumProofs(myProofs).toNumber()
     console.log('Current Balance:', currentBalance)
@@ -172,8 +166,7 @@ async function handleCommands(cmd) {
     const { token, keep } = await generateTokenToSend(wallet, amount, myProofs)
     saveProofs(dir, keep)
     console.log('Remaining Balance:', sumProofs(keep).toNumber())
-    // we can only use send once, so send everything in one shot,
-    // the connection is severed after that, and there is no ACK
+    // we can only use send once, so send everything in one shot
     const _received = await send(token)
     // if received == false, we can try to claim them again from the mint (now or later)
   }
@@ -182,12 +175,10 @@ async function handleCommands(cmd) {
     // connect to ble-swarm
     // wait for someone to connect to us and give us a token
     // swapt it and add to our proof store
-    // show new balance
-    // exit
     const tokenString = await receiveToken()
     const myProofs = loadProofs(dir)
-    // confirm step?
     const { wallet } = await openWallet()
+    // confirm step first? maybe we don't want to use the mint specified in the token
     const receivedProofs = await processToken(wallet, tokenString)
     const finalProofs = myProofs.concat(receivedProofs)
     saveProofs(dir, finalProofs)
@@ -195,9 +186,15 @@ async function handleCommands(cmd) {
   }
 
   if (cmd.current.name === deposit.name) {
+    const sats = deposit.flags.sats
+    if (!sats) {
+      console.log(deposit.help())
+      return
+    }
+    const amount = Amount.from(sats)
     const myProofs = loadProofs(dir)
     const { wallet } = await openWallet()
-    const newProofs = await mintTokens(wallet, 32)
+    const newProofs = await mintTokens(wallet, amount)
     const finalProofs = myProofs.concat(newProofs)
     saveProofs(dir, finalProofs)
     console.log('New Balance:', sumProofs(finalProofs).toNumber())
