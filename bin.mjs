@@ -174,7 +174,7 @@ async function handleCommands(cmd) {
     console.log('Remaining Balance:', sumProofs(keep).toNumber())
     // we can only use send once, so send everything in one shot,
     // the connection is severed after that, and there is no ACK
-    send(token)
+    await send(token)
   }
 
   if (cmd.current.name === get.name) {
