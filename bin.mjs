@@ -160,14 +160,13 @@ async function handleCommands(cmd) {
       return
     }
     const send = await findNeighbour(pubKey)
-    const { wallet, disconnect } = await openWallet()
+    const { wallet } = await openWallet()
     const { token, keep } = await generateTokenToSend(wallet, amount, myProofs)
     // we can only use send once, so send everything in one shot,
     // the connection is severed after that, and there is no ACK
     send(token)
     saveProofs(keep)
     console.log('Remaining Balance:', sumProofs(keep).toNumber())
-    await disconnect()
   }
 
   if (cmd.current.name === get.name) {
@@ -179,22 +178,20 @@ async function handleCommands(cmd) {
     const tokenString = await receiveToken()
     const myProofs = loadProofs(dir)
     // confirm step?
-    const { wallet, disconnect } = await openWallet()
+    const { wallet } = await openWallet()
     const receivedProofs = await processToken(wallet, tokenString)
     const finalProofs = myProofs.concat(receivedProofs)
     saveProofs(finalProofs)
     console.log('New Balance:', sumProofs(finalProofs).toNumber())
-    await disconnect()
   }
 
   if (cmd.current.name === deposit.name) {
     const myProofs = loadProofs(dir)
-    const { wallet, disconnect } = await openWallet()
+    const { wallet } = await openWallet()
     const newProofs = await mintTokens(wallet, 32)
     const finalProofs = myProofs.concat(newProofs)
     saveProofs(dir, finalProofs)
     console.log('New Balance:', sumProofs(finalProofs).toNumber())
-    await disconnect()
   }
 
   if (cmd.current.name === pay.name) {

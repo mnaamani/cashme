@@ -23,7 +23,7 @@ npx pear-install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o`
 
 ## Usage
 
-`cashme` is a terminal cashu wallet. Ecash is exchanged directly between two devices over Bluetooth Low Energy (BLE) - no server or internet connection required for the transfer itself.
+`cashme` is a terminal cashu wallet. ecash tokens are exchanged directly between two devices over Bluetooth Low Energy (BLE).
 
 Check your ecash balance:
 
