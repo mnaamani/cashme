@@ -17,6 +17,10 @@ import { openWallet, mintTokens, processToken, generateTokenToSend } from './lib
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0], path.extname(Bare.argv[0])) === 'bare'
 
+// todo: some additional commands: issue-token, import-token
+// (same functionality as give/get but instead of sending over bluetooth, dump it to stdout
+// or read it from stdin..
+
 const deposit = command(
   'deposit',
   description('Deposit new ecash into our wallet, with a lightning invoice payment (BOLT11 mint)')
