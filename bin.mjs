@@ -23,14 +23,11 @@ const deposit = command(
 )
 const give = command(
   'give',
-  description('Send ecash to a neighbour over bluetooth swarm'),
+  description('Send ecash to a neighbour over bluetooth'),
   flag('--public-key|-k <pubkey>', 'full or partial public key of neighbour')
 )
-const get = command('get', description('Receive ecash from a neighbour over bluetooth swarm'))
-const pay = command(
-  'pay',
-  description('Use ecash from our wallet to pay a lightning invoice (BOLT11 melt)')
-)
+const get = command('get', description('Receive ecash from a neighbour over bluetooth'))
+const pay = command('pay', description('Pay a lightning invoice with our ecash (BOLT11 melt)'))
 const balance = command('balance', description('Display our ecash balance'))
 const cmd = command(
   appName,
