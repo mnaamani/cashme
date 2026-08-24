@@ -12,6 +12,40 @@
 
 ## Usage
 
+`cashme` is a terminal cashu wallet. Ecash is exchanged directly between two devices over Bluetooth Low Energy (BLE) - no server or internet connection required for the transfer itself.
+
+Check your ecash balance:
+
+```sh
+cashme balance
+```
+
+Deposit funds into your wallet by paying a lightning invoice (mints new ecash):
+
+```sh
+cashme deposit
+```
+
+Send ecash to a nearby device. Give the public key (or a partial prefix) of the neighbour you want to send to:
+
+```sh
+cashme give --public-key <pubkey>
+```
+
+On the receiving device, wait to receive ecash from a nearby neighbour:
+
+```sh
+cashme get
+```
+
+Pay a lightning invoice using your ecash balance (melts ecash):
+
+```sh
+cashme pay
+```
+
+Run `cashme <command> --help` for details on any command, or `cashme --help` for the full list.
+
 ## Development
 
 ### Install Dependencies
