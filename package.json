@@ -22,6 +22,7 @@
     "@cashu/cashu-ts": "^4.9.0",
     "bare-console": "^6.2.0",
     "bare-daemon": "^1.2.4",
+    "bare-encoding": "^1.0.3",
     "bare-fetch": "^3.2.0",
     "bare-file-logger": "^1.2.1",
     "bare-fs": "^4.7.2",
@@ -40,7 +41,6 @@
     "pear-runtime": "^1.1.4",
     "protomux": "^3.11.0",
     "ready-resource": "^1.2.0",
-    "text-encoding": "^0.7.0",
     "which-runtime": "^1.4.0"
   },
   "devDependencies": {
