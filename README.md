@@ -1,23 +1,33 @@
-# cashme .... if you can
+# CASHME .... if you can
 
-> cashu wallet in your terminal, send and receive tokens over bluetooth.
+> A cashu wallet in your terminal, send and receive tokens privately over bluetooth.
 
 ## EXPERIMENTAL - Use at your own risk !!
 
-## Install
+## Getting started
+
+Build and run:
+
+```sh
+npm install
+npm run make
+./out/your-platform/cashme
+```
+
+or install pre-built binary with `pear`:
 
 ```sh
 npm -g install pear
 pear install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
 ```
 
-or
+or with `npx`:
 
 ```sh
-npx pear-install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o`
+npx pear-install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
 ```
 
-## Run
+Then run installed binary
 
 `cashme --help`
 
