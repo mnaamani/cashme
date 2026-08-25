@@ -2,6 +2,7 @@ import './lib/polyfills.mjs'
 import { command, flag, summary, description } from 'paparam'
 import { persistent } from 'bare-storage'
 import process from 'bare-process'
+import debuglog from 'bare-debug-log'
 import os from 'bare-os'
 import { isWindows } from 'which-runtime'
 import path from 'bare-path'
@@ -34,6 +35,8 @@ import {
   mintWithBalance,
   richestMint
 } from './lib/manager.mjs'
+
+const debug = debuglog('cashme:app')
 
 const appName = pkg.productName || pkg.name
 const isDev = path.basename(Bare.argv[0], path.extname(Bare.argv[0])) === 'bare'
@@ -111,8 +114,8 @@ if (cmd.flags.updater) {
   Bare.exit()
 }
 
-console.log(`Updates: ${updates === false ? 'disabled' : 'enabled'}`)
-console.log(`Storage path: ${dir}`)
+debug('updates:', updates === false ? 'disabled' : 'enabled')
+debug('storage path:', dir)
 
 if (updates !== false) {
   try {
@@ -451,7 +454,7 @@ try {
   // A locked wallet or an unreachable mint are things the user can act on. Print what
   // happened, not where in cashme it happened.
   console.error('[app:error]', err.message)
-  if (process.env.CASHME_DEBUG) console.error(err.stack)
+  if (process.env.CASHME_DEBUG || debug.enabled) console.error(err.stack)
   Bare.exitCode = 1
 } finally {
   try {

@@ -21,6 +21,7 @@
   "dependencies": {
     "@cashu/coco-core": "^2.0.0",
     "bare-console": "^6.2.0",
+    "bare-debug-log": "^2.0.0",
     "bare-daemon": "^1.2.4",
     "bare-encoding": "^1.0.3",
     "bare-fetch": "^3.2.0",

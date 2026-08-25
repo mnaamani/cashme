@@ -213,6 +213,21 @@ Errors print their message only. For the stack behind one:
 CASHME_DEBUG=1 cashme pay --invoice lnbc...
 ```
 
+### Debug logging
+
+Internal logging goes through [`bare-debug-log`](https://github.com/holepunchto/bare-debug-log)
+and is off unless `BARE_DEBUG` names a section. It writes to stderr, so stdout stays free
+for command output. Sections are `cashme:app` (startup, storage) and `cashme:ble`
+(bluetooth swarm, connections, token transfer):
+
+```sh
+BARE_DEBUG=cashme:* cashme get
+BARE_DEBUG=cashme:ble cashme give -k <pubkey> -s 10
+```
+
+With `cashme:app` enabled (`BARE_DEBUG=cashme:*` covers it) error stacks print too, so
+there is no need to set `CASHME_DEBUG` as well.
+
 ## Architecture
 
 ### Updates
