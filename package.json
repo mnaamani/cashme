@@ -55,11 +55,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/holepunchto/cashme.git"
+    "url": "https://github.com/mnaamani/cashme.git"
   },
-  "author": "Holepunch Inc",
+  "author": "Mokhtar Naamani",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/holepunchto/cashme/issues"
+    "url": "https://github.com/mnaamani/cashme/issues"
   }
 }
