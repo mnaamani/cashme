@@ -19,7 +19,7 @@
     "make:win32-x64": "bare-build --name cashme --standalone --host win32-x64 --out ./out/win32-x64 bin.mjs"
   },
   "dependencies": {
-    "@cashu/cashu-ts": "^4.9.0",
+    "@cashu/coco-core": "^2.0.0",
     "bare-console": "^6.2.0",
     "bare-daemon": "^1.2.4",
     "bare-encoding": "^1.0.3",
@@ -44,6 +44,7 @@
     "which-runtime": "^1.4.0"
   },
   "devDependencies": {
+    "@cashu/coco-adapter-tests": "^2.0.0",
     "bare-build": "^1.0.1",
     "bare-runtime": "^1.29.5",
     "brittle": "^3.19.0",
