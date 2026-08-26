@@ -21,8 +21,8 @@
   "dependencies": {
     "@cashu/coco-core": "^2.0.0",
     "bare-console": "^6.2.0",
-    "bare-debug-log": "^2.0.0",
     "bare-daemon": "^1.2.4",
+    "bare-debug-log": "^2.0.0",
     "bare-encoding": "^1.0.3",
     "bare-fetch": "^3.2.0",
     "bare-file-logger": "^1.2.1",
@@ -31,6 +31,7 @@
     "bare-path": "^3.0.0",
     "bare-process": "^4.5.0",
     "bare-storage": "^1.1.0",
+    "bare-url": "^2.5.2",
     "ble-swarm": "^2.1.0",
     "compact-encoding": "^3.0.0",
     "corestore": "^7.9.2",

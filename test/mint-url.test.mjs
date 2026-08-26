@@ -5,7 +5,8 @@ import { normalizeMintUrl } from '../lib/mint-url.mjs'
 
 test('mint urls are normalized down to one identity', (t) => {
   t.is(normalizeMintUrl('https://Mint.Example.COM/'), 'https://mint.example.com')
-  t.is(normalizeMintUrl('https://mint.example.com//'), 'https://mint.example.com')
+  // coco strips one trailing slash, not all of them; we match it rather than tidy further.
+  t.is(normalizeMintUrl('https://mint.example.com//'), 'https://mint.example.com/')
   t.is(normalizeMintUrl('HTTPS://MINT.EXAMPLE.COM/Path/'), 'https://mint.example.com/Path')
   t.is(normalizeMintUrl('https://mint.example.com:443/'), 'https://mint.example.com')
 })
