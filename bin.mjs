@@ -10,7 +10,7 @@ import FileLog from 'bare-file-logger'
 import Console from 'bare-console'
 import pkg from './package.json'
 import App from './app.js'
-import { findNeighbour, receiveToken } from './lib/ble.mjs'
+import { findNeighbour, receiveTokens } from './lib/ble.mjs'
 import { DEFAULT_MINT_URL } from './lib/constants.mjs'
 import {
   openWallet,
@@ -193,11 +193,12 @@ async function useWallet(dir) {
 
 // A promise that settles when the user interrupts the run, and a way to stop listening.
 //
-// `give` reserves proofs before it goes looking for a neighbour over bluetooth, and that
-// wait has no timeout — Ctrl-C is the normal way out of it. Until the token exists the
-// reservation can still be handed back, so the window is worth catching; after that there
-// is nothing to cancel, and `release()` puts the default behaviour back so a second Ctrl-C
-// does what Ctrl-C usually does.
+// Both bluetooth commands wait without a timeout, so Ctrl-C is the normal way out of them
+// rather than an accident. `give` reserves proofs before it goes looking for a neighbour,
+// and until the token exists that reservation can still be handed back — so the window is
+// worth catching; after it, there is nothing to cancel. `get` has nothing to undo and
+// simply stops listening. Either way `release()` puts the default behaviour back, so a
+// second Ctrl-C does what Ctrl-C usually does.
 //
 // SIGINT is the one bare lets us finish: for the others it runs the handler but still
 // takes the default action, so the cancel is a race the run can lose. That is what the
@@ -366,17 +367,28 @@ async function handleCommands(cmd) {
   }
 
   if (cmd.current.name === get.name) {
-    // connect to ble-swarm
-    // wait for someone to connect to us and give us a token
-    // swap it and add to our wallet, under the mint that issued it
-    const tokenString = await receiveToken()
+    // connect to ble-swarm, and stay there: a neighbour who owes us twice, or two of them
+    // at once, should not need us to start the command again. Each token is swapped and
+    // added to our wallet under the mint that issued it, and the run ends when the user
+    // says so.
+    //
+    // The wallet is opened up front rather than per token — it is one lock and one coco
+    // startup for the whole session, and it means no other cashme can run while we listen.
     const wallet = await useWallet(dir)
-    // TODO: a token names its own mint, which is untrusted input. Confirm with the user
-    // (or check a trusted-mint list) before trusting that mint and swapping against it.
-    const token = inspectToken(tokenString)
-    console.error(`receiving ${token.amount} ${token.unit} from ${token.mintUrl}`)
-    await processToken(wallet, tokenString)
-    await showBalances(wallet, 'New Balance')
+    const interrupt = interrupted()
+
+    await receiveTokens({
+      cancelled: interrupt.promise,
+      async ontoken(tokenString) {
+        // TODO: a token names its own mint, which is untrusted input. Confirm with the user
+        // (or check a trusted-mint list) before trusting that mint and swapping against it.
+        const token = inspectToken(tokenString)
+        console.error(`receiving ${token.amount} ${token.unit} from ${token.mintUrl}`)
+        await processToken(wallet, tokenString)
+        await showBalances(wallet, 'New Balance')
+      }
+    })
+    interrupt.release()
   }
 
   if (cmd.current.name === deposit.name) {
@@ -520,3 +532,11 @@ try {
     Bare.exitCode = 1
   }
 }
+
+// A one-shot CLI is finished when its command is finished. Everything has been awaited and
+// the wallet writes its state synchronously, so whatever still holds the loop open here is
+// a handle nobody is waiting on — a `give` that delivered leaves bluetooth's native
+// managers behind, and on their own they keep bare running for good. The updater is a
+// detached daemon and outlives us either way. So say the run is over instead of hoping the
+// loop drains on its own.
+Bare.exit(Bare.exitCode || 0)
