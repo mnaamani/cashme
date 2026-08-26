@@ -31,7 +31,8 @@ import {
   reclaimSend,
   restoreProofs,
   balances,
-  totalBalance,
+  totalBalances,
+  DEFAULT_UNIT,
   mintWithBalance,
   richestMint
 } from './lib/manager.mjs'
@@ -179,10 +180,13 @@ function updateWindow(value) {
 let opened = null
 async function useWallet(dir) {
   opened = await openWallet(dir)
-  // openWallet gives back the proofs held by sends that were prepared and never sent (see
-  // sweepPreparedSends). That changes the balance the user is about to see, so say so.
-  for (const send of opened.reclaimed) {
-    console.error(`reclaimed ${send.amount} ${send.unit} reserved by a send that never went out`)
+  // openWallet gives back the proofs held by sends and payments that were prepared and
+  // never went through (see sweepPreparedOperations). That changes the balance the user is
+  // about to see, so say so.
+  for (const operation of opened.reclaimed) {
+    console.error(
+      `reclaimed ${operation.amount} ${operation.unit} reserved by a ${operation.kind} that never happened`
+    )
   }
   return opened
 }
@@ -216,17 +220,24 @@ function interrupted() {
   return { promise, release }
 }
 
-// A mint at a time, then the total. Amounts stringify to plain numbers, so they print as
-// they come.
+// A mint and unit at a time, then a total per unit. Amounts stringify to plain numbers, so
+// they print as they come. Returns the snapshots holding reserved proofs, which is the one
+// thing a caller has ever wanted from the listing.
 async function showBalances(wallet, label = 'Balance') {
-  const entries = Object.entries(await balances(wallet))
-  for (const [mintUrl, balance] of entries) {
-    const reserved = Number(balance.reserved) ? ` (${balance.reserved} reserved)` : ''
-    console.log(`${mintUrl}: ${balance.spendable} ${balance.unit}${reserved}`)
+  const reserved = []
+  for (const [mintUrl, byUnit] of Object.entries(await balances(wallet))) {
+    for (const balance of Object.values(byUnit)) {
+      const held = Number(balance.reserved) ? ` (${balance.reserved} reserved)` : ''
+      console.log(`${mintUrl}: ${balance.spendable} ${balance.unit}${held}`)
+      if (Number(balance.reserved) > 0) reserved.push(balance)
+    }
   }
-  const total = await totalBalance(wallet)
-  console.log(`${label}: ${total.spendable} ${total.unit}`)
-  return entries
+
+  const totals = Object.values(await totalBalances(wallet))
+  // An empty wallet has no units to total, and still has to say so.
+  if (!totals.length) console.log(`${label}: 0 ${DEFAULT_UNIT}`)
+  for (const total of totals) console.log(`${label}: ${total.spendable} ${total.unit}`)
+  return reserved
 }
 
 // Spending is the one thing worth stopping to ask about, so `pay` confirms before it
@@ -273,8 +284,7 @@ async function handleCommands(cmd) {
 
   if (cmd.current.name === balance.name) {
     const wallet = await useWallet(dir)
-    const entries = await showBalances(wallet)
-    const reserved = entries.filter(([, balance]) => Number(balance.reserved) > 0)
+    const reserved = await showBalances(wallet)
     if (reserved.length) {
       console.log('Reserved proofs are in flight — sent, but not yet confirmed as claimed.')
       console.log('Every cashme run sweeps them: claimed ones are settled, the rest reclaimed.')
@@ -394,9 +404,12 @@ async function handleCommands(cmd) {
     // coco's proof repository rejects a proof it already holds, and one such collision
     // fails the whole keyset — so restoring into a wallet that still has its proofs
     // recovers nothing and reports a keyset failure. Say that up front instead.
-    const held = (await balances(wallet))[mintUrl]
-    if (held && Number(held.total) > 0) {
-      console.log(`This wallet already holds ${held.total} ${held.unit} at ${mintUrl}.`)
+    const held = Object.values((await balances(wallet))[mintUrl] ?? {}).filter(
+      (balance) => Number(balance.total) > 0
+    )
+    if (held.length) {
+      const amounts = held.map((balance) => `${balance.total} ${balance.unit}`).join(' and ')
+      console.log(`This wallet already holds ${amounts} at ${mintUrl}.`)
       console.log('Restore can only rebuild proofs this wallet has lost: coco refuses to')
       console.log('re-add ones it already has, and that fails the whole keyset.')
       console.log('Nothing was changed.')
@@ -432,7 +445,9 @@ async function handleCommands(cmd) {
     // invoice — that says what the payment will actually total.
     const quote = await quoteMelt(wallet, mintUrl, invoice)
     const total = Number(quote.amount) + Number(quote.fee_reserve)
-    const held = (await balances(wallet))[mintUrl]
+    // The mint's balance in the quote's own unit: what it holds in any other unit cannot
+    // pay this invoice.
+    const held = (await balances(wallet, { units: [quote.unit] }))[mintUrl]?.[quote.unit]
     const feePpk = await inputFeePpk(wallet, mintUrl, quote.unit)
 
     console.log(`Paying from ${mintUrl}`)
