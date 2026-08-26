@@ -179,7 +179,41 @@ function updateWindow(value) {
 let opened = null
 async function useWallet(dir) {
   opened = await openWallet(dir)
+  // openWallet gives back the proofs held by sends that were prepared and never sent (see
+  // sweepPreparedSends). That changes the balance the user is about to see, so say so.
+  for (const send of opened.reclaimed) {
+    console.error(`reclaimed ${send.amount} ${send.unit} reserved by a send that never went out`)
+  }
   return opened
+}
+
+// A promise that settles when the user interrupts the run, and a way to stop listening.
+//
+// `give` reserves proofs before it goes looking for a neighbour over bluetooth, and that
+// wait has no timeout — Ctrl-C is the normal way out of it. Until the token exists the
+// reservation can still be handed back, so the window is worth catching; after that there
+// is nothing to cancel, and `release()` puts the default behaviour back so a second Ctrl-C
+// does what Ctrl-C usually does.
+//
+// SIGINT is the one bare lets us finish: for the others it runs the handler but still
+// takes the default action, so the cancel is a race the run can lose. That is what the
+// sweep in openWallet is for — this is the tidy exit, not the guarantee.
+function interrupted() {
+  const signals = ['SIGHUP', 'SIGINT', 'SIGQUIT', 'SIGTERM']
+  const listeners = []
+  const promise = new Promise((resolve) => {
+    for (const signal of signals) {
+      // Resolve rather than reject: nothing may ever await this, and an unhandled
+      // rejection would take the run down instead of the signal.
+      const listener = () => resolve(new Error(`interrupted (${signal})`))
+      process.on(signal, listener)
+      listeners.push([signal, listener])
+    }
+  })
+  const release = () => {
+    for (const [signal, listener] of listeners) process.off(signal, listener)
+  }
+  return { promise, release }
 }
 
 // A mint at a time, then the total. Amounts stringify to plain numbers, so they print as
@@ -279,14 +313,20 @@ async function handleCommands(cmd) {
     const fee = prepared.fee
     console.log(`sending ${amount} sat${Number(fee) ? ` (+ ${fee} sat mint fee)` : ''}`)
 
+    // The bluetooth wait is where a `give` sits with proofs reserved and no token yet, so
+    // it is the one place the run has to be able to give up cleanly.
+    const interrupt = interrupted()
+
     let deliver
     try {
-      deliver = await findNeighbour(pubKey)
+      deliver = await findNeighbour(pubKey, { cancelled: interrupt.promise })
     } catch (err) {
       // No neighbour, or the user gave up: hand the reserved proofs back before leaving,
       // or they stay locked out of the balance until something else releases them.
       await cancelSend(wallet, prepared)
       throw err
+    } finally {
+      interrupt.release()
     }
 
     // From here the proofs are in flight: the token exists, so the operation has to be
