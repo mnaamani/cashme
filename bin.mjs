@@ -1,9 +1,6 @@
-// Entry point: parse the command line, decide where the wallet lives, and hand off.
+// Entry point: parse argv, decide where the wallet lives, dispatch.
 //
-// The commands themselves are in lib/cli/ — one module per command, named after it
-// (lib/cli/pay.mjs is `cashme pay`). lib/cli/commands.mjs holds the flag grammar,
-// lib/cli/session.mjs the wallet's lifetime and Ctrl-C handling, lib/cli/ui.mjs the
-// printing, and lib/updater.mjs everything about OTA updates.
+// One module per command in lib/cli/, named after it (lib/cli/pay.mjs is `cashme pay`).
 import './lib/polyfills.mjs'
 import { persistent } from 'bare-storage'
 import process from 'bare-process'
@@ -24,8 +21,8 @@ import { run as runRestore } from './lib/cli/restore.mjs'
 
 const debug = debuglog('cashme:app')
 
-// paparam runs handlers itself, but a throwing one goes through its bail(), which prints a
-// stack trace. We want the message and nothing else, so dispatch by hand instead.
+// paparam would run these itself, but a throwing handler goes through its bail(), which
+// prints a stack trace. We want the message only, so dispatch by hand.
 const handlers = new Map([
   [balance.name, runBalance],
   [deposit.name, runDeposit],
@@ -36,9 +33,8 @@ const handlers = new Map([
 ])
 
 root.parse(Bare.argv.slice(isDev ? 2 : 1))
-// paparam prints the help itself, for a subcommand as well as for the root, but it does
-// not stop us running the command afterwards — `cashme get --help` would print its help
-// and then sit waiting on bluetooth.
+// paparam prints help but does not stop us running the command — without this,
+// `cashme get --help` would print its help and then sit waiting on bluetooth.
 if (root.flags.help || root.current?.flags?.help) Bare.exit()
 if (root.flags.version) {
   console.log(`${appName} v${pkg.version}`)
@@ -81,8 +77,8 @@ try {
     await handlers.get(command.name)({ dir, flags: command.flags, command })
   }
 } catch (err) {
-  // A locked wallet or an unreachable mint are things the user can act on. Print what
-  // happened, not where in cashme it happened.
+  // A locked wallet or an unreachable mint is something the user can act on: print what
+  // happened, not where.
   console.error('[app:error]', err.message)
   if (process.env.CASHME_DEBUG || debug.enabled) console.error(err.stack)
   Bare.exitCode = 1
@@ -96,10 +92,8 @@ try {
   }
 }
 
-// A one-shot CLI is finished when its command is finished. Everything has been awaited and
-// the wallet writes its state synchronously, so whatever still holds the loop open here is
-// a handle nobody is waiting on — a `give` that delivered leaves bluetooth's native
-// managers behind, and on their own they keep bare running for good. The updater is a
-// detached daemon and outlives us either way. So say the run is over instead of hoping the
-// loop drains on its own.
+// Everything is awaited and the wallet writes synchronously, so anything still holding the
+// loop open is a handle nobody waits on — bluetooth's native managers, which ble-swarm
+// cannot always free (see lib/ble.mjs) and which keep bare alive for good. The updater is
+// detached and outlives us either way. So exit rather than hope the loop drains.
 Bare.exit(Bare.exitCode || 0)

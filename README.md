@@ -36,20 +36,17 @@ Then run installed binary
 `cashme` is a terminal cashu wallet. ecash tokens are exchanged directly between two
 devices over Bluetooth Low Energy (BLE), with no server in between.
 
-Run `cashme <command> --help` for details on any command, or `cashme --help` for the full
-list.
+Run `cashme <command> --help` for any command, or `cashme --help` for the full list.
 
 ### balance
-
-What this wallet holds, per mint and in total:
 
 ```sh
 cashme balance
 ```
 
-Proofs that are on their way to someone else are reported separately as _reserved_. They
-are not spendable, and are not lost: every run of `cashme` sweeps them, settling the ones
-the receiver claimed and reclaiming the rest at the mint.
+Per mint and in total. Proofs on their way to someone else show as _reserved_: not
+spendable, not lost. Every run of `cashme` sweeps them — settling the ones the receiver
+claimed, reclaiming the rest at the mint.
 
 ### deposit
 
@@ -61,41 +58,46 @@ cashme deposit --sats 100
 cashme deposit --sats 100 --mint https://mint.example.com
 ```
 
+Short flags: `-s`, `-m`.
+
 Without `--mint` this uses `https://testnut.cashu.space`, a **testing mint whose invoices
 pay themselves and whose ecash is worthless**. Name a real mint before expecting real money.
 
 ### give
 
 Send ecash to a nearby device, addressed by the public key (or any prefix of it) that the
-receiver's `cashme get` prints when it joins the BLE swarm:
+receiver's `cashme get` prints:
 
 ```sh
 cashme give --public-key a1b2c3 --sats 21
 cashme give --public-key a1b2c3 --sats 21 --mint https://mint.example.com
 ```
 
+Short flags: `-k`, `-s`, `-m`.
+
 `--sats` is what the receiver ends up with; the mint's swap fee comes out of your balance
 on top, and is printed before the handoff. A token can only be spent at the mint that
 issued its proofs, so without `--mint` this picks the first mint holding enough on its own
 rather than pooling several.
 
-The proofs are reserved before the search for a neighbour begins, so a spend that cannot
-happen fails immediately instead of after a wait. If no neighbour is found they are handed
-straight back. If the handoff completes but the receiver never acknowledges it, `cashme`
-tries to swap them back at the mint; should that fail, they stay tracked and the next run
-tries again.
+Proofs are reserved before the search for a neighbour starts, so an impossible spend fails
+immediately rather than after a wait. Ctrl-C while waiting hands them straight back, as
+does giving up on a neighbour that never appears. If the handoff completes but the receiver
+never acknowledges it, `cashme` tries to swap the proofs back; should that fail they stay
+tracked, and the next run tries again.
 
 ### get
 
-Wait for a nearby neighbour to send ecash. Prints this device's public key on joining the
-BLE swarm — read it out to whoever is sending:
+Wait for neighbours to send ecash. Prints this device's public key on joining the BLE
+swarm — read it out to whoever is sending:
 
 ```sh
 cashme get
 ```
 
-The received token names its own mint, which this wallet then trusts and swaps against —
-so only run this for a sender you trust.
+It keeps listening until Ctrl-C, so several senders (or the same one twice) need only one
+run. Each token names its own mint, which this wallet then trusts and swaps against — so
+only run this for a sender you trust.
 
 ### restore
 
@@ -107,12 +109,13 @@ cashme restore
 cashme restore --mint https://mint.example.com
 ```
 
-This is a repair, not a backup. It replays the deterministic secrets (NUT-13) derived from
-the seed inside this wallet's own file, so it recovers nothing if that file is gone. It
-runs against one mint at a time, because a seed does not record which mints it was used at,
-and it only works on a wallet that has _lost_ proofs: coco refuses to re-add a proof it
-already holds, so restoring into a wallet that still has its proofs does nothing and says
-so.
+Short flag: `-m`.
+
+A repair, not a backup. It replays the deterministic secrets (NUT-13) derived from the seed
+inside this wallet's own file, so it recovers nothing if that file is gone. One mint at a
+time, because a seed does not record which mints it was used at. And only for proofs the
+wallet has _lost_: coco refuses to re-add a proof it already holds, so restoring into an
+intact wallet does nothing and says so.
 
 ### pay
 
@@ -123,35 +126,34 @@ cashme pay --invoice lnbc...
 cashme pay --invoice lnbc... --mint https://mint.example.com --yes
 ```
 
-The mint quotes the invoice first, and `cashme` shows what it will cost before anything is
-spent:
+Short flags: `-i`, `-m`, `-y`.
+
+The mint quotes the invoice first, and `cashme` shows the cost before anything is spent:
 
 ```
 Paying from https://mint.example.com
   invoice     3 sat
   fee reserve 1 sat
   total       4 sat of 7 available
+The fee reserve is the mint's worst case; whatever is left comes back as change.
 Pay this invoice? [y/N]
 ```
 
-The fee reserve is the mint's worst case for routing the payment; whatever it does not use
-comes back as change, and the fee actually paid is reported once the payment settles.
-`--yes` skips the prompt, which also makes the command usable from a script; the prompt
-reads a line from stdin, so `echo y | cashme pay ...` works too. Without `--mint` the
-payment comes from the mint holding the most.
+The fee actually paid is reported once the payment settles. `--yes` skips the prompt; the
+prompt reads a line from stdin, so `echo y | cashme pay ...` works too. Without `--mint`
+the payment comes from the mint holding the most.
 
 > **Known limitation on mints that charge input fees.** coco 2.0.0 does not budget for a
 > mint's per-input fee when a melt needs a swap first: it reserves exactly what the swap
-> sends, and the fee comes out of the same proofs, so the swap is short. Because coco only
+> sends, and the fee comes out of the same proofs, so the swap is short. Since coco only
 > swaps once the selected proofs reach 11/10 of what the melt needs, a payment can only go
-> through when the total is more than ten times that fee — below that, no combination of
-> proofs works.
+> through when its total is more than ten times that fee.
 >
-> `cashme` checks the mint's `input_fee_ppk` against the quote and refuses those payments
-> before reserving anything, telling you the smallest total that could work at that mint.
-> Above the floor it goes ahead, and if coco still comes up short the operation rolls back
-> with the balance unchanged. The default mint, `testnut.cashu.space`, charges
-> `input_fee_ppk: 100`, which puts its floor at 11 sat; a mint with no input fee has none.
+> `cashme` checks the mint's `input_fee_ppk` against the quote and refuses such payments
+> before reserving anything, naming the smallest total that could work there. Above that
+> floor it goes ahead, and if coco still comes up short the operation rolls back with the
+> balance unchanged. The default mint, `testnut.cashu.space`, charges `input_fee_ppk: 100`,
+> putting its floor at 11 sat; a mint with no input fee has none.
 
 ### Global flags
 
@@ -258,15 +260,21 @@ npm start -- --no-updates
 
 ## Project Structure
 
-- `bin.mjs` - entrypoint, CLI commands and runtime wiring
+- `bin.mjs` - entrypoint: argv, storage directory, dispatch
+- `lib/cli/` - one module per command, plus the flag grammar (`commands.mjs`), the wallet's
+  lifetime and Ctrl-C handling (`session.mjs`) and the printing (`ui.mjs`)
 - `lib/manager.mjs` - opens the coco wallet and drives the deposit/send/receive/restore flows
 - `lib/coco-store.mjs` - coco `Repositories` adapter for Bare: persistence, rollback, locking
 - `lib/ble.mjs` - bluetooth transport for handing a token to a neighbour
 - `lib/seed.mjs` - the NUT-13 seed deterministic secrets derive from
 - `lib/mint-url.mjs` - canonical mint urls, and the validation coco's normalizer leaves out
 - `lib/lock.mjs` - advisory lock, one instance per storage directory
+- `lib/updater.mjs` - OTA updates: spawning the daemon, and being it
 - `lib/constants.mjs`, `lib/polyfills.mjs` - defaults, and the browser globals Bare lacks
 - `app.js` - daemon launcher and updater resource
 - `scripts/make.js` - platform/arch build target selector
-- `test/index.js` - brittle-bare test entrypoint
+- `test/index.js` - brittle-bare test entrypoint, requiring the suites below
 - `test/coco-contract.test.mjs` - coco's own storage adapter contract suites, run against `lib/coco-store.mjs`
+- `test/coco-store.test.mjs` - serialization, rollback and locking in `lib/coco-store.mjs`
+- `test/melt-fee.test.mjs` - the input-fee floor `cashme pay` refuses below
+- `test/mint-url.test.mjs` - mint url normalization and validation
