@@ -20,6 +20,9 @@
   },
   "dependencies": {
     "@cashu/coco-core": "^2.0.0",
+    "@noble/curves": "^2.3.0",
+    "@noble/hashes": "^2.3.0",
+    "@scure/base": "^2.3.0",
     "bare-console": "^6.2.0",
     "bare-daemon": "^1.2.4",
     "bare-debug-log": "^2.0.0",
@@ -32,6 +35,7 @@
     "bare-process": "^4.5.0",
     "bare-storage": "^1.1.0",
     "bare-url": "^2.5.2",
+    "bare-ws": "^3.0.0",
     "ble-swarm": "^2.1.0",
     "compact-encoding": "^3.0.0",
     "corestore": "^7.9.2",

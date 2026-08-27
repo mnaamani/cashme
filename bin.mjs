@@ -9,13 +9,14 @@ import os from 'bare-os'
 import path from 'bare-path'
 import pkg from './package.json'
 import { appName, isDev } from './lib/cli/env.mjs'
-import { root, balance, deposit, give, get, pay, restore } from './lib/cli/commands.mjs'
+import { root, balance, deposit, give, get, nutzap, pay, restore } from './lib/cli/commands.mjs'
 import { closeWallet } from './lib/cli/session.mjs'
 import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runGive } from './lib/cli/give.mjs'
 import { run as runGet } from './lib/cli/get.mjs'
+import { run as runNutzap } from './lib/cli/nutzap.mjs'
 import { run as runPay } from './lib/cli/pay.mjs'
 import { run as runRestore } from './lib/cli/restore.mjs'
 
@@ -28,6 +29,7 @@ const handlers = new Map([
   [deposit.name, runDeposit],
   [give.name, runGive],
   [get.name, runGet],
+  [nutzap.name, runNutzap],
   [pay.name, runPay],
   [restore.name, runRestore]
 ])
