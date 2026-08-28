@@ -153,8 +153,9 @@ enough of that unit on its own rather than pooling several.
 Proofs are reserved before the search for a neighbour starts, so an impossible spend fails
 immediately rather than after a wait. Ctrl-C while waiting hands them straight back, as
 does giving up on a neighbour that never appears. If the handoff completes but the receiver
-never acknowledges it, `cashme` tries to swap the proofs back; should that fail they stay
-tracked, and the next run tries again.
+never acknowledges it, `cashme` tries to swap the proofs back right away; if the mint says
+they are already spent, the receiver did get them after all, and the send stays in flight
+for `cashme pending` to settle.
 
 Bluetooth is not the only way to hand a token over. `--print` writes it to stdout instead,
 for you to carry over any channel you already trust — a private chat, a shared note —
@@ -203,6 +204,11 @@ cashme get
 It keeps listening until Ctrl-C, so several senders (or the same one twice) need only one
 run. Each token names its own mint, which this wallet then trusts and swaps against — so
 only run this for a sender you trust.
+
+The sender is told the token arrived as soon as it parses, before the mint has been asked
+to swap it. So if that swap then fails — an unreachable mint, usually — the token on screen
+is the only copy left, and `cashme` prints it rather than dropping it: keep it and claim it
+with `--token` once the mint is back.
 
 A token from somewhere else — a `give --print`, a QR, a message — is claimed on the spot,
 and the command exits rather than listening:
@@ -269,7 +275,9 @@ What happens on a run:
 4. Prepare the send, show the cost, and ask — `--yes` skips the prompt, as with `withdraw`.
 5. Execute, then publish the nutzap to their relays, signed by a nostr key generated for
    that one event and thrown away. The zap is anonymous: relays need a signature, the
-   recipient does not need to know who we are.
+   recipient does not need to know who we are. `--comment` becomes the event's content,
+   and `--event` tags the note being zapped, so clients can show it under that note rather
+   than only in the recipient's inbox.
 
 ```
 Resolving alice@example.com
@@ -319,7 +327,11 @@ What happens on a run:
 3. Fetch that endpoint's terms, and check `--sats` against the limits it advertises.
 4. Sign a kind `9734` zap request and hand it to the host, which returns an invoice.
 5. Pay that invoice exactly as `withdraw` does — same quote, same confirmation, same
-   change and fee reporting.
+   change and fee reporting. `--mint` picks which mint melts it, `--yes` skips the prompt.
+
+`--relay` adds relays to the profile lookup, repeatable. `--comment` rides along to the
+lnurl host and into the zap request, and `--event` tags the note being zapped, which is
+what puts the receipt under that note in a client rather than only on the recipient.
 
 The invoice the host returns is checked against the amount we asked for before anything is
 spent. Nothing about lnurl is signed, so a host that returns an invoice for some other
@@ -340,8 +352,8 @@ Both say so, and the second asks first:
 
 ### restore
 
-Rebuild proofs a mint issued but this wallet never recorded — a deposit interrupted before
-it was written to disk, say:
+Rebuild proofs a mint issued but this wallet never recorded — a wallet that fell behind the
+mint, through a crash mid-write or a file copied back from an older backup:
 
 ```sh
 cashme restore
@@ -375,6 +387,12 @@ Everything lives in two files in the storage directory:
   somewhere else. Lose this file and the ecash in it is gone.
 - `wallet.lock` — empty, and only there to be locked. One `cashme` may hold a wallet at a
   time; a second one is refused rather than allowed to overwrite the first one's proofs.
+
+The whole file is rewritten after every change, which a wallet this size can afford. Each
+write goes to `wallet.json.tmp`, is flushed to the disk, and is then renamed over the real
+file — so a crash leaves either the old wallet or the new one, never half of one, and never
+a rename pointing at bytes that never landed. A stray `wallet.json.tmp` is the remains of a
+crash and is ignored. The directory is created `0700`.
 
 The wallet itself is [coco](https://github.com/cashubtc/coco) (`@cashu/coco-core`), stored
 through a Bare adapter in `lib/coco-store.mjs` — coco's published adapters are SQLite,
@@ -421,8 +439,10 @@ CASHME_DEBUG=1 cashme withdraw --invoice lnbc...
 Internal logging goes through [`bare-debug-log`](https://github.com/holepunchto/bare-debug-log)
 and is off unless `BARE_DEBUG` names a section. It writes to stderr, which is where
 everything a run says about itself goes — stdout carries only what a command produces, so
-`deposit` and `give --print` can be piped straight into something else. Sections are `cashme:app` (startup, storage) and `cashme:ble`
-(bluetooth swarm, connections, token transfer):
+`deposit` and `give --print` can be piped straight into something else.
+
+Sections are `cashme:app` (startup, storage) and `cashme:ble` (bluetooth swarm,
+connections, token transfer):
 
 ```sh
 BARE_DEBUG=cashme:* cashme get
