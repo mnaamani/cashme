@@ -1,6 +1,6 @@
 // Entry point: parse argv, decide where the wallet lives, dispatch.
 //
-// One module per command in lib/cli/, named after it (lib/cli/pay.mjs is `cashme pay`).
+// One module per command in lib/cli/, named after it (lib/cli/withdraw.mjs is `cashme withdraw`).
 import './lib/polyfills.mjs'
 import { persistent } from 'bare-storage'
 import process from 'bare-process'
@@ -9,15 +9,24 @@ import os from 'bare-os'
 import path from 'bare-path'
 import pkg from './package.json'
 import { appName, isDev } from './lib/cli/env.mjs'
-import { root, balance, deposit, give, get, nutzap, pay, restore } from './lib/cli/commands.mjs'
+import {
+  root,
+  balance,
+  deposit,
+  give,
+  get,
+  nutzap,
+  withdraw,
+  restore
+} from './lib/cli/commands.mjs'
 import { closeWallet } from './lib/cli/session.mjs'
 import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
+import { run as runWithdraw } from './lib/cli/withdraw.mjs'
 import { run as runGive } from './lib/cli/give.mjs'
 import { run as runGet } from './lib/cli/get.mjs'
 import { run as runNutzap } from './lib/cli/nutzap.mjs'
-import { run as runPay } from './lib/cli/pay.mjs'
 import { run as runRestore } from './lib/cli/restore.mjs'
 
 const debug = debuglog('cashme:app')
@@ -27,10 +36,10 @@ const debug = debuglog('cashme:app')
 const handlers = new Map([
   [balance.name, runBalance],
   [deposit.name, runDeposit],
+  [withdraw.name, runWithdraw],
   [give.name, runGive],
   [get.name, runGet],
   [nutzap.name, runNutzap],
-  [pay.name, runPay],
   [restore.name, runRestore]
 ])
 

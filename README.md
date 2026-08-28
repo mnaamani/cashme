@@ -63,6 +63,45 @@ Short flags: `-s`, `-m`.
 Without `--mint` this uses `https://testnut.cashu.space`, a **testing mint whose invoices
 pay themselves and whose ecash is worthless**. Name a real mint before expecting real money.
 
+### withdraw
+
+Melt ecash back into lightning sats — the counter to `deposit`. Pays a bolt11 invoice
+out of the wallet:
+
+```sh
+cashme withdraw --invoice lnbc...
+cashme withdraw --invoice lnbc... --mint https://mint.example.com --yes
+```
+
+Short flags: `-i`, `-m`, `-y`.
+
+The mint quotes the invoice first, and `cashme` shows the cost before anything is spent:
+
+```
+Paying from https://mint.example.com
+  invoice     3 sat
+  fee reserve 1 sat
+  total       4 sat of 7 available
+The fee reserve is the mint's worst case; whatever is left comes back as change.
+Pay this invoice? [y/N]
+```
+
+The fee actually paid is reported once the payment settles. `--yes` skips the prompt; the
+prompt reads a line from stdin, so `echo y | cashme withdraw ...` works too. Without `--mint`
+the payment comes from the mint holding the most.
+
+> **Known limitation on mints that charge input fees.** coco 2.0.0 does not budget for a
+> mint's per-input fee when a melt needs a swap first: it reserves exactly what the swap
+> sends, and the fee comes out of the same proofs, so the swap is short. Since coco only
+> swaps once the selected proofs reach 11/10 of what the melt needs, a payment can only go
+> through when its total is more than ten times that fee.
+>
+> `cashme` checks the mint's `input_fee_ppk` against the quote and refuses such payments
+> before reserving anything, naming the smallest total that could work there. Above that
+> floor it goes ahead, and if coco still comes up short the operation rolls back with the
+> balance unchanged. The default mint, `testnut.cashu.space`, charges `input_fee_ppk: 100`,
+> putting its floor at 11 sat; a mint with no input fee has none.
+
 ### give
 
 Send ecash to a nearby device, addressed by the public key (or any prefix of it) that the
@@ -112,7 +151,7 @@ cashme nutzap -p npub1... -s 21 -c "thanks!" -m https://mint.example.com -y
 Short flags: `-p`, `-s`, `-m`, `-r`, `-c`, `-e`, `-y`.
 
 A nutzap is not a lightning zap. A NIP-57 zap is a lightning payment with a nostr receipt —
-that would be `cashme pay` with an address lookup in front of it. A nutzap moves the ecash
+that would be `cashme withdraw` with an address lookup in front of it. A nutzap moves the ecash
 itself: the proofs are locked to the recipient's public key (NUT-11 P2PK) and published in
 the tags of a kind `9321` event. No invoice, no route, no routing fee. It is `give`, over
 relays instead of bluetooth.
@@ -132,7 +171,7 @@ What happens on a run:
    `10019` could name its own key as the one to lock the ecash to.
 3. Pick a mint they trust and this wallet holds enough at. `--mint` overrides, and warns if
    they did not list it.
-4. Prepare the send, show the cost, and ask — `--yes` skips the prompt, as with `pay`.
+4. Prepare the send, show the cost, and ask — `--yes` skips the prompt, as with `withdraw`.
 5. Execute, then publish the nutzap to their relays, signed by a nostr key generated for
    that one event and thrown away. The zap is anonymous: relays need a signature, the
    recipient does not need to know who we are.
@@ -176,44 +215,6 @@ inside this wallet's own file, so it recovers nothing if that file is gone. One 
 time, because a seed does not record which mints it was used at. And only for proofs the
 wallet has _lost_: coco refuses to re-add a proof it already holds, so restoring into an
 intact wallet does nothing and says so.
-
-### pay
-
-Melt ecash back into lightning sats — pay a bolt11 invoice out of the wallet:
-
-```sh
-cashme pay --invoice lnbc...
-cashme pay --invoice lnbc... --mint https://mint.example.com --yes
-```
-
-Short flags: `-i`, `-m`, `-y`.
-
-The mint quotes the invoice first, and `cashme` shows the cost before anything is spent:
-
-```
-Paying from https://mint.example.com
-  invoice     3 sat
-  fee reserve 1 sat
-  total       4 sat of 7 available
-The fee reserve is the mint's worst case; whatever is left comes back as change.
-Pay this invoice? [y/N]
-```
-
-The fee actually paid is reported once the payment settles. `--yes` skips the prompt; the
-prompt reads a line from stdin, so `echo y | cashme pay ...` works too. Without `--mint`
-the payment comes from the mint holding the most.
-
-> **Known limitation on mints that charge input fees.** coco 2.0.0 does not budget for a
-> mint's per-input fee when a melt needs a swap first: it reserves exactly what the swap
-> sends, and the fee comes out of the same proofs, so the swap is short. Since coco only
-> swaps once the selected proofs reach 11/10 of what the melt needs, a payment can only go
-> through when its total is more than ten times that fee.
->
-> `cashme` checks the mint's `input_fee_ppk` against the quote and refuses such payments
-> before reserving anything, naming the smallest total that could work there. Above that
-> floor it goes ahead, and if coco still comes up short the operation rolls back with the
-> balance unchanged. The default mint, `testnut.cashu.space`, charges `input_fee_ppk: 100`,
-> putting its floor at 11 sat; a mint with no input fee has none.
 
 ### Global flags
 
@@ -272,7 +273,7 @@ Development runs are unbundled, so they exercise the daemon lifecycle without re
 Errors print their message only. For the stack behind one:
 
 ```sh
-CASHME_DEBUG=1 cashme pay --invoice lnbc...
+CASHME_DEBUG=1 cashme withdraw --invoice lnbc...
 ```
 
 ### Debug logging
@@ -337,6 +338,6 @@ npm start -- --no-updates
 - `test/index.js` - brittle-bare test entrypoint, requiring the suites below
 - `test/coco-contract.test.mjs` - coco's own storage adapter contract suites, run against `lib/coco-store.mjs`
 - `test/coco-store.test.mjs` - serialization, rollback and locking in `lib/coco-store.mjs`
-- `test/melt-fee.test.mjs` - the input-fee floor `cashme pay` refuses below
+- `test/melt-fee.test.mjs` - the input-fee floor `cashme withdraw` refuses below
 - `test/mint-url.test.mjs` - mint url normalization and validation
 - `test/nostr.test.mjs` - npub decoding and NIP-01 event ids and signatures
