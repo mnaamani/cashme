@@ -54,11 +54,21 @@ Mint new ecash by paying a lightning invoice. `cashme` prints the invoice and wa
 mint to see it paid:
 
 ```sh
-cashme deposit --sats 100
-cashme deposit --sats 100 --mint https://mint.example.com
+cashme deposit --amount 100
+cashme deposit --amount 100 --mint https://mint.example.com
+cashme deposit --amount 5 --unit usd --mint https://mint.example.com
 ```
 
-Short flags: `-s`, `-m`.
+Short flags: `-a`, `-m`, `-u`.
+
+`--amount` is counted in `--unit`, which defaults to `sat`. A mint may issue more than one
+unit, and each is a separate balance: 100 sat and 5 usd at the same mint are two holdings
+that never add up or convert. Which units a mint offers is its own business — ask for one
+it does not issue and the mint refuses.
+
+`deposit` and `withdraw` are the only commands that take `--unit`. `give`, `nutzap` and
+`zap` all send sats and take `--sats`, because nothing about them is denominated any other
+way — a nutzap is priced in sats and an lnurl amount is millisats.
 
 Without `--mint` this uses `https://testnut.cashu.space`, a **testing mint whose invoices
 pay themselves and whose ecash is worthless**. Name a real mint before expecting real money.
@@ -71,9 +81,15 @@ out of the wallet:
 ```sh
 cashme withdraw --invoice lnbc...
 cashme withdraw --invoice lnbc... --mint https://mint.example.com --yes
+cashme withdraw --invoice lnbc... --unit usd
 ```
 
-Short flags: `-i`, `-m`, `-y`.
+Short flags: `-i`, `-m`, `-u`, `-y`.
+
+`--unit` is which of the wallet's balances to melt from, defaulting to `sat`. Without
+`--mint` the payment comes from the mint holding the most of that unit. The mint is asked
+to quote in it, and a mint that answers in some other unit is refused before anything is
+reserved.
 
 The mint quotes the invoice first, and `cashme` shows the cost before anything is spent:
 
@@ -87,8 +103,7 @@ Pay this invoice? [y/N]
 ```
 
 The fee actually paid is reported once the payment settles. `--yes` skips the prompt; the
-prompt reads a line from stdin, so `echo y | cashme withdraw ...` works too. Without `--mint`
-the payment comes from the mint holding the most.
+prompt reads a line from stdin, so `echo y | cashme withdraw ...` works too.
 
 > **Known limitation on mints that charge input fees.** coco 2.0.0 does not budget for a
 > mint's per-input fee when a melt needs a swap first: it reserves exactly what the swap
@@ -151,7 +166,7 @@ cashme nutzap -p npub1... -s 21 -c "thanks!" -m https://mint.example.com -y
 Short flags: `-p`, `-s`, `-m`, `-r`, `-c`, `-e`, `-y`.
 
 A nutzap is not a lightning zap. A NIP-57 zap is a lightning payment with a nostr receipt —
-that would be `cashme withdraw` with an address lookup in front of it. A nutzap moves the ecash
+that is `cashme zap`, below. A nutzap moves the ecash
 itself: the proofs are locked to the recipient's public key (NUT-11 P2PK) and published in
 the tags of a kind `9321` event. No invoice, no route, no routing fee. It is `give`, over
 relays instead of bluetooth.
@@ -197,6 +212,51 @@ Send this nutzap? [y/N]
 Receiving nutzaps is not implemented: it needs a stable nostr identity for this wallet —
 a key to publish a kind `10019` under and to unlock P2PK proofs with — where sending needs
 no identity at all.
+
+### zap
+
+Pay a nostr user over lightning, with a receipt they can show (NIP-57):
+
+```sh
+cashme zap --pubkey npub1... --sats 21
+cashme zap --pubkey alice@example.com --sats 21
+cashme zap -p npub1... -s 21 -c "thanks!" -e <event-id> -y
+```
+
+Short flags: `-p`, `-s`, `-m`, `-r`, `-c`, `-e`, `-y`.
+
+The counterpart to `nutzap`, and the opposite trade. A nutzap hands over the ecash itself
+and touches no lightning; a zap melts ecash at a mint, which routes real sats to their
+node, and their lnurl host publishes a kind `9735` receipt that clients show under the
+note. So a zap is visible where a nutzap is not — and the mint learns who was paid.
+
+What happens on a run:
+
+1. Resolve `--pubkey`. An npub or hex key is read as-is; a `name@domain` address is looked
+   up over NIP-05 first, since that is the form that can carry a receipt.
+2. Read their kind `0` profile off the relays for a lightning address (`lud16`) or an
+   lnurl (`lud06`).
+3. Fetch that endpoint's terms, and check `--sats` against the limits it advertises.
+4. Sign a kind `9734` zap request and hand it to the host, which returns an invoice.
+5. Pay that invoice exactly as `withdraw` does — same quote, same confirmation, same
+   change and fee reporting.
+
+The invoice the host returns is checked against the amount we asked for before anything is
+spent. Nothing about lnurl is signed, so a host that returns an invoice for some other
+amount is refused rather than paid.
+
+**Zaps from this wallet are anonymous.** The zap request is signed with a key generated
+for that one zap and thrown away, exactly as a nutzap is, because the wallet holds no nostr
+identity. The sats arrive and the receipt is published, but it credits an npub nobody
+recognises — it will not appear on your profile.
+
+Two cases fall back to an ordinary lightning payment, with no receipt and nothing on nostr.
+Both say so, and the second asks first:
+
+- A `name@domain` that has no NIP-05 record. It is still a valid lightning address, so it
+  is paid as one.
+- A host that does not take zap requests (no `allowsNostr`). The payment still reaches
+  them, so `cashme` explains what is lost and asks before going ahead.
 
 ### restore
 
@@ -327,7 +387,8 @@ npm start -- --no-updates
 - `lib/manager.mjs` - opens the coco wallet and drives the deposit/send/receive/restore flows
 - `lib/coco-store.mjs` - coco `Repositories` adapter for Bare: persistence, rollback, locking
 - `lib/ble.mjs` - bluetooth transport for handing a token to a neighbour
-- `lib/nostr.mjs` - the keys, signed events and relay sockets `nutzap` needs
+- `lib/nostr.mjs` - the keys, signed events and relay sockets `nutzap` and `zap` need
+- `lib/lnurl.mjs` - lnurl-pay: lightning address to endpoint to invoice, for `zap`
 - `lib/seed.mjs` - the NUT-13 seed deterministic secrets derive from
 - `lib/mint-url.mjs` - canonical mint urls, and the validation coco's normalizer leaves out
 - `lib/lock.mjs` - advisory lock, one instance per storage directory
@@ -341,3 +402,4 @@ npm start -- --no-updates
 - `test/melt-fee.test.mjs` - the input-fee floor `cashme withdraw` refuses below
 - `test/mint-url.test.mjs` - mint url normalization and validation
 - `test/nostr.test.mjs` - npub decoding and NIP-01 event ids and signatures
+- `test/lnurl.test.mjs` - lnurl address/bech32 handling and the bolt11 amount check

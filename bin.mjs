@@ -16,6 +16,7 @@ import {
   give,
   get,
   nutzap,
+  zap,
   withdraw,
   restore
 } from './lib/cli/commands.mjs'
@@ -27,6 +28,7 @@ import { run as runWithdraw } from './lib/cli/withdraw.mjs'
 import { run as runGive } from './lib/cli/give.mjs'
 import { run as runGet } from './lib/cli/get.mjs'
 import { run as runNutzap } from './lib/cli/nutzap.mjs'
+import { run as runZap } from './lib/cli/zap.mjs'
 import { run as runRestore } from './lib/cli/restore.mjs'
 
 const debug = debuglog('cashme:app')
@@ -40,6 +42,7 @@ const handlers = new Map([
   [give.name, runGive],
   [get.name, runGet],
   [nutzap.name, runNutzap],
+  [zap.name, runZap],
   [restore.name, runRestore]
 ])
 
