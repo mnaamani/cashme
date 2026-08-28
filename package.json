@@ -34,6 +34,8 @@
     "bare-path": "^3.0.0",
     "bare-process": "^4.5.0",
     "bare-storage": "^1.1.0",
+    "bare-subprocess": "^5.2.3",
+    "bare-tty": "^5.1.0",
     "bare-url": "^2.5.2",
     "bare-ws": "^3.0.0",
     "ble-swarm": "^2.1.0",

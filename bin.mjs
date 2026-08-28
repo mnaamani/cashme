@@ -15,6 +15,7 @@ import {
   deposit,
   give,
   get,
+  pending,
   nutzap,
   zap,
   withdraw,
@@ -27,6 +28,7 @@ import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runWithdraw } from './lib/cli/withdraw.mjs'
 import { run as runGive } from './lib/cli/give.mjs'
 import { run as runGet } from './lib/cli/get.mjs'
+import { run as runPending } from './lib/cli/pending.mjs'
 import { run as runNutzap } from './lib/cli/nutzap.mjs'
 import { run as runZap } from './lib/cli/zap.mjs'
 import { run as runRestore } from './lib/cli/restore.mjs'
@@ -41,6 +43,7 @@ const handlers = new Map([
   [withdraw.name, runWithdraw],
   [give.name, runGive],
   [get.name, runGet],
+  [pending.name, runPending],
   [nutzap.name, runNutzap],
   [zap.name, runZap],
   [restore.name, runRestore]

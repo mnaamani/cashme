@@ -34,7 +34,8 @@ Then run installed binary
 ## Usage
 
 `cashme` is a terminal cashu wallet. ecash tokens are exchanged directly between two
-devices over Bluetooth Low Energy (BLE), with no server in between.
+devices over Bluetooth Low Energy (BLE), with no server in between — or handed over as
+text or a QR code, for you to carry across whatever channel you trust.
 
 Run `cashme <command> --help` for any command, or `cashme --help` for the full list.
 
@@ -45,8 +46,10 @@ cashme balance
 ```
 
 Per mint and in total. Proofs on their way to someone else show as _reserved_: not
-spendable, not lost. Every run of `cashme` sweeps them — settling the ones the receiver
-claimed, reclaiming the rest at the mint.
+spendable, not lost. Every run of `cashme` sweeps what it safely can — a send that never
+produced a token hands its proofs straight back, and one the mint reports spent is
+settled. What is left is a token still out there: `cashme pending` says so, and reclaims
+it when you know it was never taken.
 
 ### deposit
 
@@ -66,9 +69,10 @@ unit, and each is a separate balance: 100 sat and 5 usd at the same mint are two
 that never add up or convert. Which units a mint offers is its own business — ask for one
 it does not issue and the mint refuses.
 
-`deposit` and `withdraw` are the only commands that take `--unit`. `give`, `nutzap` and
-`zap` all send sats and take `--sats`, because nothing about them is denominated any other
-way — a nutzap is priced in sats and an lnurl amount is millisats.
+`deposit`, `withdraw` and `give` take `--amount` with a `--unit`, because each of them
+moves whichever unit the mint issued. `nutzap` and `zap` take `--sats` instead: nothing
+about them is denominated any other way — a nutzap is priced in sats and an lnurl amount is
+millisats.
 
 Without `--mint` this uses `https://testnut.cashu.space`, a **testing mint whose invoices
 pay themselves and whose ecash is worthless**. Name a real mint before expecting real money.
@@ -123,22 +127,59 @@ Send ecash to a nearby device, addressed by the public key (or any prefix of it)
 receiver's `cashme get` prints:
 
 ```sh
-cashme give --public-key a1b2c3 --sats 21
-cashme give --public-key a1b2c3 --sats 21 --mint https://mint.example.com
+cashme give --public-key a1b2c3 --amount 21
+cashme give --public-key a1b2c3 --amount 21 --mint https://mint.example.com
+cashme give --public-key a1b2c3 --amount 5 --unit usd
 ```
 
-Short flags: `-k`, `-s`, `-m`.
+Short flags: `-k`, `-a`, `-u`, `-m`.
 
-`--sats` is what the receiver ends up with; the mint's swap fee comes out of your balance
-on top, and is printed before the handoff. A token can only be spent at the mint that
-issued its proofs, so without `--mint` this picks the first mint holding enough on its own
-rather than pooling several.
+`--public-key` addresses the bluetooth link and nothing else — it is the key the receiver's
+`cashme get` prints for that swarm, not a key the ecash is locked to. What travels over the
+link is a bearer token, spendable by whoever ends up holding it. (Locking a send to a
+recipient's key is what `nutzap` does, with their nostr key.)
+
+`--amount` is what the receiver ends up with, counted in `--unit`; the mint's swap fee comes
+out of your balance on top, and is printed before the handoff. A token can only be spent at
+the mint that issued its proofs, so without `--mint` this picks the first mint holding
+enough of that unit on its own rather than pooling several.
 
 Proofs are reserved before the search for a neighbour starts, so an impossible spend fails
 immediately rather than after a wait. Ctrl-C while waiting hands them straight back, as
 does giving up on a neighbour that never appears. If the handoff completes but the receiver
 never acknowledges it, `cashme` tries to swap the proofs back; should that fail they stay
 tracked, and the next run tries again.
+
+Bluetooth is not the only way to hand a token over. `--print` writes it to stdout instead,
+for you to carry over any channel you already trust — a private chat, a shared note —
+`--qr` also draws it for a mobile ecash wallet to scan, and `--copy` puts it on the system
+clipboard, ready to paste:
+
+```sh
+cashme give --amount 21 --print
+cashme give --amount 21 --copy
+cashme give --amount 21 --qr
+```
+
+Short flags: `-p`, `-q`, `-c`. Each of the three implies the others' "hand it over
+yourself" part, so no `--public-key` is needed — nobody is being addressed.
+
+The token is printed even when it goes on the clipboard: a clipboard is one copy away from
+being overwritten, and the text is the only copy that survives that. Clipboards belong to
+the system rather than to us, so this pipes into whichever program owns yours — `pbcopy` on
+macOS, `clip` on Windows, `wl-copy`, `xclip` or `xsel` on linux. With none of them
+installed — a headless box, say — it says so and the token is still on screen.
+
+A token handed over this way gets no acknowledgement, so the mint is the only witness:
+`cashme` polls it until the proofs come back spent, and the sats stay reserved meanwhile.
+Stop waiting whenever you like — the send stays pending, for `cashme pending` to settle
+later. Nothing is reclaimed behind your back, because a printed token can still be claimed
+by whoever holds it.
+
+A QR is one terminal column per module, and a token is base64url — case-sensitive, so no
+alphanumeric-mode shortcut of the sort the deposit invoice gets. Only small tokens fit:
+`cashme` says how wide the code would have to be when it does not, and the text above it
+is just as good.
 
 ### get
 
@@ -152,6 +193,33 @@ cashme get
 It keeps listening until Ctrl-C, so several senders (or the same one twice) need only one
 run. Each token names its own mint, which this wallet then trusts and swaps against — so
 only run this for a sender you trust.
+
+A token from somewhere else — a `give --print`, a QR, a message — is claimed on the spot,
+and the command exits rather than listening:
+
+```sh
+cashme get --token cashuB...
+cashme get < token.txt
+pbpaste | cashme get
+```
+
+Short flag: `-t`. Stdin is read whenever it is not a terminal, or on `--token -`.
+
+### pending
+
+List the sends whose token is out in the world with no answer yet, and settle them:
+
+```sh
+cashme pending
+cashme pending --reclaim
+```
+
+Short flag: `-r`. Bluetooth sends settle themselves on the receiver's acknowledgement; a
+token you handed over yourself has none, so its sats stay reserved until this asks the
+mint what became of them. Proofs the mint reports spent are the receiver's, and the send
+is finalized. `--reclaim` swaps the rest back into the balance — worth doing only once you
+know the token never arrived, since the receiver could still claim it up to that moment.
+A nutzap is locked to its recipient's key and can never be reclaimed, only waited on.
 
 ### nutzap
 
@@ -345,7 +413,7 @@ for command output. Sections are `cashme:app` (startup, storage) and `cashme:ble
 
 ```sh
 BARE_DEBUG=cashme:* cashme get
-BARE_DEBUG=cashme:ble cashme give -k <pubkey> -s 10
+BARE_DEBUG=cashme:ble cashme give -k <pubkey> -a 10
 ```
 
 With `cashme:app` enabled (`BARE_DEBUG=cashme:*` covers it) error stacks print too, so
