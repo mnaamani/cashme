@@ -45,16 +45,19 @@ Run `cashme <command> --help` for any command, or `cashme --help` for the full l
 cashme balance
 ```
 
-Per mint and in total. Proofs on their way to someone else show as _reserved_: not
-spendable, not lost. Every run of `cashme` sweeps what it safely can — a send that never
-produced a token hands its proofs straight back, and one the mint reports spent is
-settled. What is left is a token still out there: `cashme pending` says so, and reclaims
-it when you know it was never taken.
+Per mint and in total, on stdout; anything explaining those figures goes to stderr.
+
+A send whose token is already out there is in neither figure — coco counts the proofs it
+can spend, and those are promised to someone else — so `balance` names the amount in
+flight separately and points at `cashme pending`. Every run of `cashme` sweeps what it
+safely can on the way: a send that never produced a token hands its proofs straight back,
+and one the mint reports spent is settled. What is left is a token still out there, which
+only you can say the fate of.
 
 ### deposit
 
-Mint new ecash by paying a lightning invoice. `cashme` prints the invoice and waits for the
-mint to see it paid:
+Mint new ecash by paying a lightning invoice. `cashme` prints the invoice — to stdout, on
+its own line — and waits for the mint to see it paid:
 
 ```sh
 cashme deposit --amount 100
@@ -73,6 +76,9 @@ it does not issue and the mint refuses.
 moves whichever unit the mint issued. `nutzap` and `zap` take `--sats` instead: nothing
 about them is denominated any other way — a nutzap is priced in sats and an lnurl amount is
 millisats.
+
+Stopping the wait does not lose the deposit: if the invoice was paid, the next `cashme` to
+open the wallet redeems it and says so, before it prints anything else.
 
 Without `--mint` this uses `https://testnut.cashu.space`, a **testing mint whose invoices
 pay themselves and whose ecash is worthless**. Name a real mint before expecting real money.
@@ -171,10 +177,14 @@ macOS, `clip` on Windows, `wl-copy`, `xclip` or `xsel` on linux. With none of th
 installed — a headless box, say — it says so and the token is still on screen.
 
 A token handed over this way gets no acknowledgement, so the mint is the only witness:
-`cashme` polls it until the proofs come back spent, and the sats stay reserved meanwhile.
-Stop waiting whenever you like — the send stays pending, for `cashme pending` to settle
-later. Nothing is reclaimed behind your back, because a printed token can still be claimed
-by whoever holds it.
+`cashme` polls it until the proofs come back spent, and the amount is out of the
+balance meanwhile. Stop waiting whenever you like — the send stays pending, for `cashme pending` to
+settle later. Nothing is reclaimed behind your back, because a printed token can still be
+claimed by whoever holds it.
+
+Only the token goes to stdout; everything `give` says about the send goes to stderr. So
+`cashme give --amount 21 --print > token.txt` leaves the token alone in the file, with the
+balances and the fee still on screen. `deposit` prints its invoice the same way.
 
 A QR is one terminal column per module, and a token is base64url — case-sensitive, so no
 alphanumeric-mode shortcut of the sort the deposit invoice gets. Only small tokens fit:
@@ -203,7 +213,9 @@ cashme get < token.txt
 pbpaste | cashme get
 ```
 
-Short flag: `-t`. Stdin is read whenever it is not a terminal, or on `--token -`.
+Short flags: `-t`, `-b`. Stdin is read whenever it is not a terminal, or on `--token -` —
+which includes a script or a service, where there is no terminal and nobody typing either.
+`--bluetooth` says to listen there regardless.
 
 ### pending
 
@@ -215,8 +227,8 @@ cashme pending --reclaim
 ```
 
 Short flag: `-r`. Bluetooth sends settle themselves on the receiver's acknowledgement; a
-token you handed over yourself has none, so its sats stay reserved until this asks the
-mint what became of them. Proofs the mint reports spent are the receiver's, and the send
+token you handed over yourself has none, so its amount sits outside the balance until this
+asks the mint what became of it. Proofs the mint reports spent are the receiver's, and the send
 is finalized. `--reclaim` swaps the rest back into the balance — worth doing only once you
 know the token never arrived, since the receiver could still claim it up to that moment.
 A nutzap is locked to its recipient's key and can never be reclaimed, only waited on.
@@ -407,8 +419,9 @@ CASHME_DEBUG=1 cashme withdraw --invoice lnbc...
 ### Debug logging
 
 Internal logging goes through [`bare-debug-log`](https://github.com/holepunchto/bare-debug-log)
-and is off unless `BARE_DEBUG` names a section. It writes to stderr, so stdout stays free
-for command output. Sections are `cashme:app` (startup, storage) and `cashme:ble`
+and is off unless `BARE_DEBUG` names a section. It writes to stderr, which is where
+everything a run says about itself goes — stdout carries only what a command produces, so
+`deposit` and `give --print` can be piped straight into something else. Sections are `cashme:app` (startup, storage) and `cashme:ble`
 (bluetooth swarm, connections, token transfer):
 
 ```sh
@@ -455,6 +468,8 @@ npm start -- --no-updates
 - `lib/manager.mjs` - opens the coco wallet and drives the deposit/send/receive/restore flows
 - `lib/coco-store.mjs` - coco `Repositories` adapter for Bare: persistence, rollback, locking
 - `lib/ble.mjs` - bluetooth transport for handing a token to a neighbour
+- `lib/clipboard.mjs` - the platform's clipboard program, for `give --copy`
+- `lib/notes.mjs` - the one stderr write path, and the flush a run exits through
 - `lib/nostr.mjs` - the keys, signed events and relay sockets `nutzap` and `zap` need
 - `lib/lnurl.mjs` - lnurl-pay: lightning address to endpoint to invoice, for `zap`
 - `lib/seed.mjs` - the NUT-13 seed deterministic secrets derive from

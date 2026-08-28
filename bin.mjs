@@ -32,6 +32,7 @@ import { run as runPending } from './lib/cli/pending.mjs'
 import { run as runNutzap } from './lib/cli/nutzap.mjs'
 import { run as runZap } from './lib/cli/zap.mjs'
 import { run as runRestore } from './lib/cli/restore.mjs'
+import { note, flush } from './lib/notes.mjs'
 
 const debug = debuglog('cashme:app')
 
@@ -49,7 +50,15 @@ const handlers = new Map([
   [restore.name, runRestore]
 ])
 
-root.parse(Bare.argv.slice(isDev ? 2 : 1))
+// A malformed command line throws out of parse() (see the bail handler in commands.mjs),
+// and it throws here rather than inside a command, so it needs catching on its own.
+try {
+  root.parse(Bare.argv.slice(isDev ? 2 : 1))
+} catch (err) {
+  note('[app:error]', err.message)
+  await flush()
+  Bare.exit(1)
+}
 // paparam prints help but does not stop us running the command — without this,
 // `cashme get --help` would print its help and then sit waiting on bluetooth.
 if (root.flags.help || root.current?.flags?.help) Bare.exit()
@@ -65,7 +74,8 @@ let wait
 try {
   wait = updateWindow(root.flags.updateWindow)
 } catch (err) {
-  console.error('[app:error]', err.message)
+  note('[app:error]', err.message)
+  await flush()
   Bare.exit(1)
 }
 
@@ -81,7 +91,8 @@ if (updates !== false) {
   try {
     spawnUpdater(dir, wait)
   } catch (err) {
-    console.error('[app:error]', err)
+    note('[app:error]', err.message)
+    await flush()
     Bare.exit(1)
   }
 }
@@ -96,15 +107,15 @@ try {
 } catch (err) {
   // A locked wallet or an unreachable mint is something the user can act on: print what
   // happened, not where.
-  console.error('[app:error]', err.message)
-  if (process.env.CASHME_DEBUG || debug.enabled) console.error(err.stack)
+  note('[app:error]', err.message)
+  if (process.env.CASHME_DEBUG || debug.enabled) note(err.stack)
   Bare.exitCode = 1
 } finally {
   try {
     await closeWallet()
   } catch (err) {
     // Never let a failure to close bury the error that actually stopped the command.
-    console.error('[app:error] could not close the wallet cleanly:', err.message)
+    note('[app:error] could not close the wallet cleanly:', err.message)
     Bare.exitCode = 1
   }
 }
@@ -113,4 +124,8 @@ try {
 // loop open is a handle nobody waits on — bluetooth's native managers, which ble-swarm
 // cannot always free (see lib/ble.mjs) and which keep bare alive for good. The updater is
 // detached and outlives us either way. So exit rather than hope the loop drains.
+//
+// Except that stderr is one of those queues: exiting on the spot would cut off the last
+// lines the command wrote, which are usually the ones saying how it went.
+await flush()
 Bare.exit(Bare.exitCode || 0)
