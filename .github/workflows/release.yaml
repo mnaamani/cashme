@@ -1,12 +1,18 @@
 name: Release
 
-# Builds a standalone cashme for every supported host and attaches them to a GitHub
-# release, which is what install.sh downloads. Tag and push to cut one:
+# Builds a standalone cashme for every supported host, once, and packages it for both
+# channels cashme is distributed through:
 #
-#   git tag v0.1.0 && git push origin v0.1.0
+#   http  — one archive per host plus SHA256SUMS, attached to a GitHub release. What
+#           install.sh downloads, and what @cashme/cli falls back to.
+#   pear  — by-arch.tar.gz, every host in the layout pear-install and the OTA updater
+#           read. Downloaded by scripts/stage.sh to seed the pear link.
 #
-# Assets are named cashme-<host>.tar.gz (cashme-win32-<arch>.zip on windows), each holding
-# a single `cashme` binary, plus a SHA256SUMS the installer verifies against.
+# Both come out of the same compile, so the two channels cannot drift within a release.
+#
+#   git tag v0.1.0 && git push origin v0.1.0   cuts a release
+#   workflow_dispatch with a tag               rebuilds and republishes that release
+#   workflow_dispatch with no tag              builds artifacts only, publishes nothing
 
 on:
   push:
@@ -14,15 +20,64 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to build and release
-        required: true
+        description: Existing tag to publish a release for. Leave empty to build artifacts only.
+        required: false
 
 permissions:
   contents: read
 
 jobs:
+  setup:
+    name: Resolve tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      release: ${{ steps.resolve.outputs.release }}
+      ref: ${{ steps.resolve.outputs.ref }}
+    steps:
+      - name: Resolve
+        id: resolve
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="$INPUT_TAG"
+          if [ -z "$tag" ] && [ "${{ github.ref_type }}" = tag ]; then tag="${{ github.ref_name }}"; fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "ref=${tag:-${{ github.ref }}}" >> "$GITHUB_OUTPUT"
+          if [ -n "$tag" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "Publishing a release for $tag"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "No tag given — building artifacts only"
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.resolve.outputs.ref }}
+
+      # The updater compares the version in the seeded package.json against the version
+      # compiled into the running binary, and only ever moves forward. A tag whose manifest
+      # says something else would ship a build that silently updates nobody, so stop here
+      # rather than at the far end of a seed.
+      - name: Check package.json version matches the tag
+        if: steps.resolve.outputs.release == 'true'
+        env:
+          TAG: ${{ steps.resolve.outputs.tag }}
+        run: |
+          version="$(node -p 'require("./package.json").version')"
+          if [ "$version" != "${TAG#v}" ]; then
+            echo "::error::package.json is $version but the tag is $TAG."
+            echo "::error::Bump package.json to ${TAG#v} and retag, or the OTA updater will not offer this build."
+            exit 1
+          fi
+          echo "package.json $version matches $TAG"
+
   build:
     name: ${{ matrix.host }}
+    needs: setup
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     strategy:
@@ -44,8 +99,17 @@ jobs:
     steps:
       - name: Setup repo
         uses: holepunchto/actions/.github/steps/setup-repo@v1
-        with:
-          ref: ${{ inputs.tag || github.ref }}
+
+      # setup-repo takes no ref and checks out whatever triggered the run, which is the tag
+      # on a tag push but the branch on a manual dispatch. Move to the tag explicitly so
+      # both routes build the same commit.
+      - name: Check out the tag
+        if: needs.setup.outputs.tag != ''
+        env:
+          TAG: ${{ needs.setup.outputs.tag }}
+        run: |
+          git fetch --depth 1 origin "+refs/tags/$TAG:refs/tags/$TAG"
+          git checkout --force "refs/tags/$TAG"
 
       - name: Install w/ dev deps
         run: npm ci
@@ -62,41 +126,100 @@ jobs:
       - name: Package (windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          Compress-Archive -Path out/${{ matrix.host }}/cashme.exe -DestinationPath cashme-${{ matrix.host }}.zip
+        run: Compress-Archive -Path out/${{ matrix.host }}/cashme.exe -DestinationPath cashme-${{ matrix.host }}.zip
 
-      - name: Upload artifact
+      # Two uploads of the same build: the archive is what a person downloads, the bare
+      # binary is what pear-build wants.
+      - name: Upload archive
         uses: actions/upload-artifact@v4
         with:
-          name: cashme-${{ matrix.host }}
+          name: asset-${{ matrix.host }}
           path: cashme-${{ matrix.host }}.*
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
 
-  release:
-    name: Publish release
-    needs: build
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.host }}
+          path: out/${{ matrix.host }}/cashme*
+          if-no-files-found: error
+          retention-days: 7
+
+  by-arch:
+    name: Package by-arch
+    needs: [setup, build]
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
+    timeout-minutes: 15
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.setup.outputs.ref }}
+
       - name: Download builds
         uses: actions/download-artifact@v4
         with:
+          pattern: bin-*
+          path: apps
+
+      # upload-artifact does not carry the executable bit, and pear-build needs it.
+      - name: Build by-arch
+        run: |
+          chmod +x apps/bin-darwin-*/cashme apps/bin-linux-*/cashme
+          npx --yes pear-build@1.1.1 \
+            --darwin-arm64-app apps/bin-darwin-arm64/cashme \
+            --darwin-x64-app apps/bin-darwin-x64/cashme \
+            --linux-arm64-app apps/bin-linux-arm64/cashme \
+            --linux-x64-app apps/bin-linux-x64/cashme \
+            --win32-x64-app apps/bin-win32-x64/cashme.exe \
+            --win32-arm64-app apps/bin-win32-arm64/cashme.exe \
+            --target deployment \
+            --package package.json
+          tar -C deployment -czf by-arch.tar.gz .
+
+      - name: Upload by-arch
+        uses: actions/upload-artifact@v4
+        with:
+          name: by-arch
+          path: by-arch.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish release
+    needs: [setup, build, by-arch]
+    if: needs.setup.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Download archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: asset-*
           path: assets
           merge-multiple: true
 
+      - name: Download by-arch
+        uses: actions/download-artifact@v4
+        with:
+          name: by-arch
+          path: assets
+
+      # One SHA256SUMS over everything, so install.sh and scripts/stage.sh verify the same
+      # way against the same file.
       - name: Checksums
         working-directory: assets
         run: |
-          sha256sum cashme-* > SHA256SUMS
+          sha256sum cashme-* by-arch.tar.gz > SHA256SUMS
           cat SHA256SUMS
 
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.setup.outputs.tag }}
         run: |
           gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \

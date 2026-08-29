@@ -11,6 +11,7 @@
     "lint": "prettier . --check && lunte",
     "start": "bare bin.mjs --no-updates",
     "make": "node scripts/make.js",
+    "stage": "bash scripts/stage.sh",
     "make:darwin-arm64": "bare-build --name cashme --standalone --host darwin-arm64 --out ./out/darwin-arm64 bin.mjs",
     "make:darwin-x64": "bare-build --name cashme --standalone --host darwin-x64 --out ./out/darwin-x64 bin.mjs",
     "make:linux-arm64": "bare-build --name cashme --standalone --host linux-arm64 --out ./out/linux-arm64 bin.mjs",
