@@ -6,7 +6,7 @@
 # Downloads the standalone binary for this platform from a GitHub release and puts it in
 # ~/.local/bin. If no release asset fits (or GitHub is unreachable) and node is around, it
 # falls back to bootstrapping from the pear network, which is the same path
-# `npm i -g cashme` takes.
+# `npm i -g @cashme/cli` takes.
 #
 # Options, as flags (curl -fsSL ... | sh -s -- --dir /usr/local/bin) or environment:
 #   --dir <path>      CASHME_INSTALL_DIR   where to put the binary  (~/.local/bin)
@@ -114,7 +114,7 @@ detect_host() {
     Darwin) os=darwin ;;
     Linux) os=linux ;;
     MINGW* | MSYS* | CYGWIN*)
-      die "windows is not installed by this script — use: npm install -g cashme" ;;
+      die "windows is not installed by this script — use: npm install -g @cashme/cli" ;;
     *) die "unsupported operating system: $os" ;;
   esac
 

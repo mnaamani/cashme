@@ -1,5 +1,5 @@
 {
-  "name": "cashme",
+  "name": "@cashme/cli",
   "version": "0.1.0",
   "description": "Installer for cashme, a cashu wallet in your terminal",
   "main": "cashme.js",
@@ -10,6 +10,9 @@
     "cashme.js",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=18"
   },

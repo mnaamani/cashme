@@ -16,7 +16,7 @@ curl -fsSL https://raw.githubusercontent.com/mnaamani/cashme/main/install.sh | s
 or with npm, which bootstraps the same binary off the pear network instead:
 
 ```sh
-npm install -g cashme
+npm install -g @cashme/cli
 ```
 
 or with `pear` itself, or `pear-install` on its own:
@@ -48,7 +48,7 @@ skips that for a run. To uninstall, delete the binary — the wallet's storage l
   installs it. `--dir` puts it somewhere else, `--version` pins a release, `--force`
   replaces an existing install; `sh install.sh --help` lists the rest. With no release
   asset for your platform it falls back to the pear network, which needs node.
-- **`npm install -g cashme`** ([`npm/`](npm)) installs a shim that, on its first run,
+- **`npm install -g @cashme/cli`** ([`npm/`](npm)) installs a shim that, on its first run,
   fetches the binary and then execs it — the same shape as `npm i -g pear`. Nothing but the
   shim comes from the registry, so the wallet itself is never a package update behind. It
   tries the pear network first and falls back to the same release download `install.sh`

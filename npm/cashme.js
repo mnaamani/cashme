@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// npm install -g cashme puts this shim on the PATH. It is not the wallet — the wallet is a
+// npm install -g @cashme/cli puts this shim on the PATH. It is not the wallet — the wallet is a
 // standalone Bare binary, fetched on first run and dropped in ~/.local/bin
 // (%LOCALAPPDATA%\Programs\cashme on windows). Every run after that is just an exec of that
 // binary, so the shim costs one existsSync and stays out of the way.
@@ -239,7 +239,7 @@ function fail(err) {
   console.error('')
   console.error('The wallet is fetched on first run, not by npm, so retry with:')
   console.error('  cashme')
-  console.error('Rerunning npm install -g cashme would only reinstall this shim.')
+  console.error('Rerunning npm install -g @cashme/cli would only reinstall this shim.')
   console.error(`Or take a binary from https://github.com/${REPO}/releases`)
   process.exit(1)
 }

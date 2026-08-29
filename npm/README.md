@@ -3,7 +3,7 @@
 A cashu wallet in your terminal — send and receive ecash privately over Bluetooth.
 
 ```sh
-npm install -g cashme
+npm install -g @cashme/cli
 cashme --help
 ```
 
@@ -37,7 +37,7 @@ curl -fsSL https://raw.githubusercontent.com/mnaamani/cashme/main/install.sh | s
 npx pear-install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
 ```
 
-Uninstall with `rm ~/.local/bin/cashme` (plus `npm uninstall -g cashme` for this shim).
+Uninstall with `rm ~/.local/bin/cashme` (plus `npm uninstall -g @cashme/cli` for this shim).
 Wallet storage lives elsewhere and is left alone — see the
 [README](https://github.com/mnaamani/cashme#the-wallet-on-disk).
 
