@@ -100,11 +100,15 @@ jobs:
       - name: Setup repo
         uses: holepunchto/actions/.github/steps/setup-repo@v1
 
-      # setup-repo takes no ref and checks out whatever triggered the run, which is the tag
-      # on a tag push but the branch on a manual dispatch. Move to the tag explicitly so
-      # both routes build the same commit.
+      # setup-repo takes no ref and checks out whatever triggered the run. On a tag push that
+      # is already the tag; on a manual dispatch it is the branch, so move to the tag.
+      #
+      # shell: bash is required, not cosmetic. Windows runners default to pwsh, where $TAG is
+      # a PowerShell variable rather than the env var, and $TAG:refs parses as scope-qualified
+      # variable syntax — the refspec came out as '+refs/tags//tags/'.
       - name: Check out the tag
-        if: needs.setup.outputs.tag != ''
+        if: inputs.tag != ''
+        shell: bash
         env:
           TAG: ${{ needs.setup.outputs.tag }}
         run: |
