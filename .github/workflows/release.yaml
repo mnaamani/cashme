@@ -1,0 +1,104 @@
+name: Release
+
+# Builds a standalone cashme for every supported host and attaches them to a GitHub
+# release, which is what install.sh downloads. Tag and push to cut one:
+#
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# Assets are named cashme-<host>.tar.gz (cashme-win32-<arch>.zip on windows), each holding
+# a single `cashme` binary, plus a SHA256SUMS the installer verifies against.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build and release
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.host }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            host: linux-x64
+          - os: ubuntu-24.04-arm
+            host: linux-arm64
+          - os: macos-latest
+            host: darwin-arm64
+          - os: macos-15-intel
+            host: darwin-x64
+          - os: windows-latest
+            host: win32-x64
+          - os: windows-11-arm
+            host: win32-arm64
+    steps:
+      - name: Setup repo
+        uses: holepunchto/actions/.github/steps/setup-repo@v1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Install w/ dev deps
+        run: npm ci
+
+      - name: Build
+        run: npm run make:${{ matrix.host }}
+
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        run: |
+          chmod +x out/${{ matrix.host }}/cashme
+          tar -C out/${{ matrix.host }} -czf cashme-${{ matrix.host }}.tar.gz cashme
+
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path out/${{ matrix.host }}/cashme.exe -DestinationPath cashme-${{ matrix.host }}.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cashme-${{ matrix.host }}
+          path: cashme-${{ matrix.host }}.*
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download builds
+        uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
+
+      - name: Checksums
+        working-directory: assets
+        run: |
+          sha256sum cashme-* > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "$TAG" --generate-notes
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber assets/*

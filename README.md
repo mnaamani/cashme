@@ -4,32 +4,73 @@
 
 ## EXPERIMENTAL - Use at your own risk !!
 
-## Getting started
+## Install
 
-Build and run:
+With a shell, taking the binary for your platform from the latest
+[release](https://github.com/mnaamani/cashme/releases):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mnaamani/cashme/main/install.sh | sh
+```
+
+or with npm, which bootstraps the same binary off the pear network instead:
+
+```sh
+npm install -g cashme
+```
+
+or with `pear` itself, or `pear-install` on its own:
+
+```sh
+npm install -g pear
+pear install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
+
+npx pear-install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
+```
+
+Every route puts the same standalone binary in `~/.local/bin/cashme`
+(`%LOCALAPPDATA%\Programs\cashme\cashme.exe` on windows) and, if that directory is not on
+your PATH, adds it to your shell's rc file. Open a new terminal, then:
+
+```sh
+cashme --help
+```
+
+The wallet keeps itself up to date in the background from its own pear link, so whichever
+way it got there, it does not need reinstalling to move to a newer version. `--no-updates`
+skips that for a run. To uninstall, delete the binary — the wallet's storage lives
+[elsewhere](#the-wallet-on-disk) and outlives it.
+
+### Which route to use
+
+- **`curl | sh`** ([`install.sh`](install.sh)) needs nothing but curl. It downloads the
+  release asset for your platform, checks it against the release's `SHA256SUMS`, and
+  installs it. `--dir` puts it somewhere else, `--version` pins a release, `--force`
+  replaces an existing install; `sh install.sh --help` lists the rest. With no release
+  asset for your platform it falls back to the pear network, which needs node.
+- **`npm install -g cashme`** ([`npm/`](npm)) installs a shim that, on its first run,
+  fetches the binary and then execs it — the same shape as `npm i -g pear`. Nothing but the
+  shim comes from the registry, so the wallet itself is never a package update behind. It
+  tries the pear network first and falls back to the same release download `install.sh`
+  does, `SHA256SUMS` check included, so neither route depends on the other working;
+  `CASHME_METHOD=release` (or `pear`) forces one. That first run is also where it can fail,
+  and since `npm install` has already succeeded by then the retry is `cashme` again rather
+  than a reinstall. Whatever you typed is carried through, so `cashme balance` on a new
+  machine installs the wallet and then reports the balance.
+- **`pear install`** is the same bootstrap, done by the pear CLI you may already have.
+
+### Build from source
 
 ```sh
 npm install
 npm run make
-./out/your-platform/cashme
+./out/your-platform/cashme --help
 ```
 
-or install pre-built binary with `pear`:
-
-```sh
-npm -g install pear
-pear install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
-```
-
-or with `npx`:
-
-```sh
-npx pear-install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
-```
-
-Then run installed binary
-
-`cashme --help`
+`npm run make` builds for the host it runs on; `npm run make:<host>` cross-builds for any
+of `darwin-arm64`, `darwin-x64`, `linux-arm64`, `linux-x64`, `win32-arm64`, `win32-x64`.
+Tagging `v*` runs [`release.yaml`](.github/workflows/release.yaml), which builds all six
+and attaches them, plus `SHA256SUMS`, to a GitHub release — the assets `install.sh` reads.
 
 ## Usage
 

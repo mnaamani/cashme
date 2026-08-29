@@ -1,0 +1,46 @@
+{
+  "name": "cashme",
+  "version": "0.1.0",
+  "description": "Installer for cashme, a cashu wallet in your terminal",
+  "main": "cashme.js",
+  "bin": {
+    "cashme": "cashme.js"
+  },
+  "files": [
+    "cashme.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "format": "prettier --write .",
+    "lint": "prettier --check ."
+  },
+  "dependencies": {
+    "graceful-goodbye": "^1.3.2",
+    "pear-install": "^1.2.0",
+    "tiny-byte-size": "^1.1.0",
+    "which-runtime": "^1.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mnaamani/cashme.git",
+    "directory": "npm"
+  },
+  "author": "Mokhtar Naamani",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/mnaamani/cashme/issues"
+  },
+  "homepage": "https://github.com/mnaamani/cashme#readme",
+  "keywords": [
+    "ecash",
+    "cashu",
+    "bitcoin",
+    "lightning",
+    "nostr",
+    "wallet",
+    "pear"
+  ]
+}
