@@ -1,6 +1,6 @@
 {
   "name": "cashme",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Cashu wallet as a standalone Bare process on Pear, with OTA updater support.",
   "private": true,
   "bin": "bin.mjs",
