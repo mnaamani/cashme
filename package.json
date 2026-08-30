@@ -8,6 +8,8 @@
   "scripts": {
     "format": "prettier . --write",
     "test": "brittle-bare test/index.js",
+    "test:integration": "brittle-bare test/integration/index.js",
+    "test:all": "npm test && npm run test:integration",
     "lint": "prettier . --check && lunte",
     "start": "bare bin.mjs --no-updates",
     "make": "node scripts/make.js",
@@ -46,6 +48,7 @@
     "hypercore-crypto": "^3.7.0",
     "hyperdht": "^6.33.2",
     "hyperswarm": "^4.17.0",
+    "nostr-tools": "^2.25.0",
     "paparam": "^1.10.1",
     "pear-runtime": "^1.1.4",
     "protomux": "^3.11.0",
@@ -79,5 +82,12 @@
     "nostr",
     "zap",
     "cashu"
-  ]
+  ],
+  "overrides": {
+    "nostr-tools": {
+      "@noble/curves": "$@noble/curves",
+      "@noble/hashes": "$@noble/hashes",
+      "@scure/base": "$@scure/base"
+    }
+  }
 }

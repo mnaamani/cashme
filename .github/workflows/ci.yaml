@@ -46,3 +46,22 @@ jobs:
 
       - name: Test
         run: npm test
+
+  integration:
+    name: Integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Setup repo
+        uses: holepunchto/actions/.github/steps/setup-repo@v1
+
+      - name: Install w/ dev deps
+        run: npm install
+
+      - name: Install Bare
+        run: npm i -g bare-runtime
+
+      # Spends at a real mint and talks to a local nostr relay. testnut issues ecash
+      # without a lightning payment, which is the only reason this can run unattended.
+      - name: Test
+        run: npm run test:integration

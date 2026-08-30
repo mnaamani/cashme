@@ -608,7 +608,12 @@ npm start -- --no-updates
 ## Scripts
 
 - `npm start` - run the Bare Process in dev mode (`bare bin.mjs --no-updates`)
-- `npm test` - run `brittle-bare` tests
+- `npm test` - run the unit suite (fast, no network)
+- `npm run test:integration` - run the integration suite: the wallet against a real mint,
+  and the nostr code against a relay the tests control. Needs the network.
+  `CASHME_TEST_OFFLINE=1` skips the parts that spend, leaving the local ones;
+  `CASHME_TEST_MINT=<url>` points them at another mint.
+- `npm run test:all` - both suites
 - `npm run lint` - run prettier check and lunte
 - `npm run format` - format repository with prettier
 - `npm run make` - auto-detect host OS/arch and run matching build target
@@ -632,7 +637,8 @@ npm start -- --no-updates
 - `lib/dht.mjs` - hyperdht transport for handing a token to a peer anywhere
 - `lib/clipboard.mjs` - the platform's clipboard program, for `give --copy`
 - `lib/notes.mjs` - the one stderr write path, and the flush a run exits through
-- `lib/nostr.mjs` - the keys, signed events and relay sockets `nutzap` and `zap` need
+- `lib/nostr.mjs` - the keys, signed events and relay pool `nutzap` and `zap` need
+- `lib/websocket.mjs` - the browser-shaped WebSocket nostr-tools drives, over bare-ws
 - `lib/lnurl.mjs` - lnurl-pay: lightning address to endpoint to invoice, for `zap`
 - `lib/seed.mjs` - the NUT-13 seed deterministic secrets derive from
 - `lib/mint-url.mjs` - canonical mint urls, and the validation coco's normalizer leaves out
@@ -648,3 +654,9 @@ npm start -- --no-updates
 - `test/mint-url.test.mjs` - mint url normalization and validation
 - `test/nostr.test.mjs` - npub decoding and NIP-01 event ids and signatures
 - `test/lnurl.test.mjs` - lnurl address/bech32 handling and the bolt11 amount check
+- `test/integration/index.js` - integration entrypoint, requiring the suites below
+- `test/integration/helpers.mjs` - throwaway wallets, running the real CLI, and a stub relay
+- `test/integration/relay.test.mjs` - what the wallet does with a relay that lies
+- `test/integration/lnurl.test.mjs` - what it does with an lnurl host that answers badly
+- `test/integration/mint.test.mjs` - mint, send, claim and reclaim against a real mint
+- `test/integration/nutzap.test.mjs` - a whole nutzap, checked where it lands

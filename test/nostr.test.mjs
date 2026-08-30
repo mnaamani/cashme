@@ -102,6 +102,17 @@ test('a tampered or forged event does not verify', (t) => {
   t.absent(verifyEvent({ ...event, sig: 'ff'.repeat(64) }), 'a junk signature fails')
 })
 
+// nostr-tools' finalizeEvent marks what it returns as already-verified, under a symbol
+// its own verifyEvent trusts without rechecking. A spread copies that mark, so if it ever
+// leaked out of signEvent a rewritten event would verify. It must not survive.
+test('a signed event carries no claim that it is already verified', (t) => {
+  const { secretKey } = ephemeralKeypair()
+  const event = signEvent({ kind: 9321, content: 'hi', tags: [] }, secretKey)
+
+  t.alike(Object.getOwnPropertySymbols(event), [], 'no symbols ride along on a signed event')
+  t.absent(verifyEvent({ ...event, content: 'rewritten' }), 'a copy is checked, not believed')
+})
+
 test('an event that is not shaped like an event does not verify', (t) => {
   const { secretKey } = ephemeralKeypair()
   const event = signEvent({ kind: 10019, content: '', tags: [] }, secretKey)
@@ -125,8 +136,12 @@ test('a nostr address is told apart from a key', (t) => {
 
   t.absent(isAddress(NPUB), 'an npub is a key, not an address')
   t.absent(isAddress(HEX), 'hex is a key, not an address')
-  t.absent(isAddress('example.com'), 'a bare domain is not an address; NIP-05 wants _@domain')
   t.absent(isAddress('alice@'), 'half an address is not one')
-  t.absent(isAddress('alice+tag@example.com'), 'NIP-05 local parts are narrower than email')
   t.absent(isAddress('alice@example'), 'a domain needs a tld')
+
+  // nip05's own definition, wider than the one this module used to carry: a bare domain is
+  // NIP-05's `_@domain` written short, and the local part allows `+`. Both go to the
+  // network now rather than being refused up front.
+  t.ok(isAddress('example.com'), 'a bare domain is the _@domain form')
+  t.ok(isAddress('alice+tag@example.com'), 'the local part is as wide as nip05 says')
 })
