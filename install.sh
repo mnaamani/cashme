@@ -157,19 +157,24 @@ verify_checksum() {
   base="$1"
   asset="$2"
 
+  # Both halves fail closed. An unverified binary is one this script has no reason to
+  # trust, and it holds the keys to real money — so a missing tool or a missing sums file
+  # stops the install rather than downgrading it to a plain download.
   sum=""
   if command -v sha256sum >/dev/null 2>&1; then
     sum="$(sha256sum "$TMPDIR_CASHME/$asset" | cut -d' ' -f1)"
   elif command -v shasum >/dev/null 2>&1; then
     sum="$(shasum -a 256 "$TMPDIR_CASHME/$asset" | cut -d' ' -f1)"
   else
-    say "! no sha256sum or shasum on this system — skipping checksum verification"
-    return 0
+    die "no sha256sum or shasum on this system, so $asset cannot be verified.
+Install one of them, or bootstrap from peers instead:
+  sh install.sh --method pear"
   fi
 
   if ! fetch "$base/SHA256SUMS" "$TMPDIR_CASHME/SHA256SUMS"; then
-    say "! release publishes no SHA256SUMS — skipping checksum verification"
-    return 0
+    die "no SHA256SUMS published alongside $asset, so it cannot be verified.
+Refusing to install. Report it if it persists:
+  https://github.com/$REPO/issues"
   fi
 
   want="$(grep " \{1,2\}\*\{0,1\}$asset\$" "$TMPDIR_CASHME/SHA256SUMS" | cut -d' ' -f1)"

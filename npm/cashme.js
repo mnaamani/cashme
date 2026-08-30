@@ -154,22 +154,31 @@ async function fromRelease() {
   }
 }
 
+// Fails closed, as install.sh does: an unverified binary is one this shim has no reason to
+// trust, and it holds the keys to real money. A missing sums file throws rather than
+// installing anyway — under CASHME_METHOD=auto the pear network has already been tried, so
+// there is nothing left to fall back to that would be safer.
 async function verify(base, asset, sha) {
   let sums = null
   try {
     sums = await download(`${base}/SHA256SUMS`)
   } catch {
-    console.error('! this release publishes no SHA256SUMS — skipping checksum verification')
-    return
+    throw new Error(
+      `no SHA256SUMS published alongside ${asset}, so it cannot be verified\n` +
+        `Refusing to install. Report it if it persists: https://github.com/${REPO}/issues`
+    )
   }
 
-  const line = sums
+  // The name is matched as its own field, not as a suffix of the line: `endsWith` would
+  // take the entry for `not-really-${asset}` as this asset's.
+  const entries = sums
     .toString()
     .split('\n')
-    .find((l) => l.trim().endsWith(asset))
-  if (!line) throw new Error(`SHA256SUMS has no entry for ${asset}`)
+    .map((l) => l.trim().split(/\s+/))
+    .filter(([, name]) => name && name.replace(/^\*/, '') === asset)
+  if (entries.length !== 1) throw new Error(`SHA256SUMS has no single entry for ${asset}`)
 
-  const want = line.trim().split(/\s+/)[0]
+  const want = entries[0][0]
   if (want !== sha) {
     throw new Error(
       `checksum mismatch for ${asset}\n  expected ${want}\n  got      ${sha}\n` +
