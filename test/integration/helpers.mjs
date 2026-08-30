@@ -86,6 +86,78 @@ export function cli(dir, args, { timeout = 120000, until = null } = {}) {
   })
 }
 
+// A CLI run the test keeps hold of while it is still going.
+//
+// `cli` above is for a command that ends, or that only has to say one thing before being
+// stopped. A handover needs both sides at once: the receiver has to be listening, and the
+// key it prints read off, before the sender can be started against it. So this hands back
+// the running process and a way to wait on a line of its output.
+export function session(t, dir, args) {
+  const child = spawn(
+    process.execPath,
+    [path.join(ROOT, 'bin.mjs'), '--no-updates', '--storage', dir, ...args],
+    { cwd: ROOT, stdio: ['pipe', 'pipe', 'pipe'] }
+  )
+
+  const run = { output: '' }
+  let waiting = null
+  let closed = false
+
+  const settle = () => {
+    if (!waiting) return
+    if (waiting.pattern.test(run.output)) {
+      const { resolve, timer } = waiting
+      waiting = null
+      clearTimeout(timer)
+      resolve(run.output)
+    } else if (closed) {
+      const { reject, timer } = waiting
+      waiting = null
+      clearTimeout(timer)
+      reject(new Error(`\`cashme ${args.join(' ')}\` ended first. Output:\n${run.output}`))
+    }
+  }
+
+  const read = (data) => {
+    run.output += data
+    settle()
+  }
+  child.stdout.on('data', read)
+  child.stderr.on('data', read)
+  child.stdin.end()
+  child.on('close', () => {
+    closed = true
+    settle()
+  })
+
+  // Resolves once the run has printed something matching, on the output so far or on what
+  // it prints next.
+  run.waitFor = (pattern, timeout = 120000) =>
+    new Promise((resolve, reject) => {
+      waiting = {
+        pattern,
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          waiting = null
+          reject(
+            new Error(
+              `\`cashme ${args.join(' ')}\` never printed ${pattern} within ${timeout}ms. ` +
+                `Output:\n${run.output}`
+            )
+          )
+        }, timeout)
+      }
+      settle()
+    })
+
+  run.kill = () => child.kill('SIGKILL')
+  // These runs are meant to outlive the assertion they were started for, so nothing else
+  // stops them.
+  t.teardown(run.kill)
+  return run
+}
+
 // A relay that says exactly what a test tells it to.
 //
 // The point is not to be a relay: it is to be a relay we can make dishonest. A real one
