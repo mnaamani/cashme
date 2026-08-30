@@ -246,18 +246,18 @@ cashme give --dht --public-key <64-hex-key> --amount 21
 Short flag: `-d`. `--public-key` is then the receiver's full 64-character key from
 `cashme get --dht`, because it is an address rather than something to scan for: the DHT
 resolves that exact key to the peer listening on it, so there is no prefix to match. It is
-still only an address — the token it carries is bearer ecash, locked to nobody. It is
-normally their wallet's own address and does not change, so it is worth saving; if they ran
-`get --dht --ephemeral` it belongs to that run alone, and you need the current one.
+still only an address — the token it carries is bearer ecash, locked to nobody. It belongs
+to the run of `cashme get --dht` that printed it, so you need the current one; if they ran
+it with `--stable` the key is their wallet's own and does not change, so it is worth saving.
 
-The link names you to them too. The key this wallet connects with is the same address its
-own `cashme get --dht` announces, so a receiver paid twice can tell both sends came from
-here — useful if they ever want to accept only from people they know, and a lasting
-identifier handed to everyone you pay otherwise. `--ephemeral` (`-e`) sends under a
-one-run key instead, recognisable to nobody:
+The link names you to them too. By default this wallet connects under a key of that run's
+own, recognisable to nobody. `--stable` (`-s`) sends under this wallet's own address — the
+same one its `cashme get --dht --stable` announces — so a receiver paid twice can tell both
+sends came from here: useful if they ever want to accept only from people they know, and a
+lasting identifier handed to everyone you pay otherwise.
 
 ```sh
-cashme give --dht --ephemeral --public-key <64-hex-key> --amount 21
+cashme give --dht --stable --public-key <64-hex-key> --amount 21
 ```
 
 Everything else is as it is over bluetooth: the proofs are reserved first, Ctrl-C hands
@@ -323,30 +323,30 @@ To be paid from anywhere rather than from the room, listen on the hyperdht inste
 cashme get --dht
 ```
 
-Unlike the bluetooth key, the one this prints is derived from the wallet's own seed, so it
-is the same on every run: a sender saves it once, the way they would a phone number,
-instead of being read a fresh one per payment. All 64 characters of it, since the DHT
-resolves an exact key rather than scanning for a prefix.
+Like the bluetooth key, the one this prints belongs to the run that printed it and leaves
+nothing to look up afterwards. The sender needs it while the command is running, so it
+suits a payment being arranged there and then rather than one that might arrive tomorrow.
+All 64 characters of it, since the DHT resolves an exact key rather than scanning for a
+prefix.
 
-That reusability is also what it costs. Listening announces the key on the DHT together
-with the address — or the relay nodes — that reach this machine, so anyone you have ever
-given it to can afterwards check whether this wallet is online, and roughly from where, for
-as long as the wallet exists. It says nothing about the seed behind it, and no ecash is
-locked to it, but it is a lasting public identifier for the wallet.
-
-Where that is not a trade worth making — a one-off payment from a stranger, a run on a
-network you would rather not be seen on — `--ephemeral` gives the run its own address and
-leaves nothing to look up afterwards:
+`--stable` instead derives the address from the wallet's own seed, so it is the same on
+every run: a sender saves it once, the way they would a phone number, instead of being read
+a fresh one per payment:
 
 ```sh
-cashme get --dht --ephemeral
+cashme get --dht --stable
 ```
 
-Short flag: `-e`. The sender then needs the key while the command is running, so it suits a
-payment being arranged there and then rather than one that might arrive tomorrow. Which
-kind of key is in use is printed above it either way. `give --dht` takes the same flag, for
-the key it presents to the receiver. On bluetooth it is redundant on both commands and says
-so: those keys are new every run already.
+That reusability is what it costs. Listening announces the key on the DHT together with the
+address — or the relay nodes — that reach this machine, so anyone you have ever given it to
+can afterwards check whether this wallet is online, and roughly from where, for as long as
+the wallet exists. It says nothing about the seed behind it, and no ecash is locked to it,
+but it is a lasting public identifier for the wallet — worth it for a key you hand out
+once, not for a one-off payment from a stranger.
+
+Short flag: `-s`. Which kind of key is in use is printed above it either way. `give --dht`
+takes the same flag, for the key it presents to the receiver. On bluetooth it is redundant
+on both commands and says so: those keys are new every run already.
 
 A token from somewhere else — a `give --print`, a QR, a message — is claimed on the spot,
 and the command exits rather than listening:
