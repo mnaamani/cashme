@@ -20,8 +20,13 @@ const KEY = /our public key: ([0-9a-f]{64})/
 
 // Start a listener and read the address off it. It stays up — the caller either pays it or
 // leaves it to the teardown.
+//
+// --mint is what makes an unattended receive possible: these wallets are fresh, so the mint
+// the incoming token names is one they have never used, and with no terminal to ask on
+// `get` refuses it rather than trusting whoever paid it (see lib/cli/get.mjs). Naming the
+// mint here is the same decision a user makes by typing it.
 async function listening(t, dir, flags = []) {
-  const run = session(t, dir, ['get', '--dht', ...flags])
+  const run = session(t, dir, ['get', '--dht', '--mint', MINT, ...flags])
   const output = await run.waitFor(KEY)
   run.key = KEY.exec(output)[1]
   return run

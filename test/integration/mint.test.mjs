@@ -51,6 +51,35 @@ test('a token round trips through the mint and comes back whole', opts, async (t
   t.ok(back <= 200 && back > 190, `the ecash came back whole (${back} sat)`)
 })
 
+test('a mint the wallet has never used is refused, not trusted', opts, async (t) => {
+  const sender = walletdir(t)
+  await cli(sender, ['deposit', '--amount', '200', '--mint', MINT])
+
+  const give = await cli(sender, ['give', '--print', '--amount', '50'], {
+    until: /waiting for the receiver/
+  })
+  const token = /cashuB[A-Za-z0-9_-]+/.exec(give.output)?.[0]
+  t.ok(token, 'a token to offer a wallet that has never heard of this mint')
+
+  // A fresh wallet, so the mint the token names is a stranger — and a test has no terminal
+  // to be asked on, which is the case a listening `get` runs in on a server.
+  const stranger = walletdir(t)
+  const refused = await cli(stranger, ['get', '--token', token])
+  t.not(refused.code, 0, 'the claim fails rather than trusting whoever issued the token')
+  t.ok(/never used/.test(refused.output), 'and says why')
+  t.ok(new RegExp(`--mint ${MINT}`).test(refused.output), 'naming the way to accept it')
+
+  // Refusing must leave nothing behind: a mint recorded here would be one a later send
+  // could be funded from, which is the whole point of not trusting it.
+  const balance = await cli(stranger, ['balance'])
+  t.absent(new RegExp(MINT).test(balance.output), 'the mint was not added to the wallet')
+
+  // The same token, the same wallet, with the mint named: the ecash arrives.
+  const accepted = await cli(stranger, ['get', '--token', token, '--mint', MINT])
+  t.is(accepted.code, 0, '`--mint` is what lets it through')
+  t.ok(satsIn(accepted.output, 'New Balance') >= 49, 'and the ecash lands in the balance')
+})
+
 test('a send nobody claimed is handed back', opts, async (t) => {
   const dir = walletdir(t)
   await cli(dir, ['deposit', '--amount', '200', '--mint', MINT])
