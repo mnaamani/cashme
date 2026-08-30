@@ -217,7 +217,11 @@ function place(src) {
   }
   fs.chmodSync(BIN, 0o755)
 
-  // macOS quarantines anything downloaded over http; without this the first run is a dialog.
+  // Strip Gatekeeper's quarantine tag, as install.sh does — and, as there, usually there is
+  // none to strip: the attribute is set by the downloading application, and node's https is
+  // no more one of those than curl is. It matters for a binary that reached this machine
+  // some other way. Where there is a tag, Apple's notarization check is what goes with it,
+  // leaving the checksum above as the only thing standing behind this binary.
   if (process.platform === 'darwin') {
     spawnSync('xattr', ['-d', 'com.apple.quarantine', BIN], { stdio: 'ignore' })
   }

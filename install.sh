@@ -227,7 +227,17 @@ or: sudo sh -c 'CASHME_INSTALL_DIR=/usr/local/bin sh install.sh'"
   fi
   chmod 0755 "$BIN"
 
-  # macOS quarantines anything curl brought down; without this the first run is a dialog.
+  # Strip Gatekeeper's quarantine tag, so the first run is not a "cannot be opened because
+  # the developer cannot be verified" dialog.
+  #
+  # Usually there is no tag to strip: the attribute is set by the downloading application,
+  # and only ones declaring LSFileQuarantineEnabled set it — browsers and Mail do, curl and
+  # wget do not. So this is a no-op on the path above, and earns its place when the tarball
+  # came down through a browser and this script was pointed at it.
+  #
+  # Where there is a tag, what is being skipped is Apple's notarization check. The checksum
+  # verified above is then the only thing standing behind this binary, which is why that
+  # check fails closed rather than being skipped when it cannot be made.
   if [ "$(uname -s)" = Darwin ] && command -v xattr >/dev/null 2>&1; then
     xattr -d com.apple.quarantine "$BIN" >/dev/null 2>&1 || true
   fi
