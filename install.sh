@@ -157,19 +157,24 @@ verify_checksum() {
   base="$1"
   asset="$2"
 
+  # Both halves fail closed. An unverified binary is one this script has no reason to
+  # trust, and it holds the keys to real money — so a missing tool or a missing sums file
+  # stops the install rather than downgrading it to a plain download.
   sum=""
   if command -v sha256sum >/dev/null 2>&1; then
     sum="$(sha256sum "$TMPDIR_CASHME/$asset" | cut -d' ' -f1)"
   elif command -v shasum >/dev/null 2>&1; then
     sum="$(shasum -a 256 "$TMPDIR_CASHME/$asset" | cut -d' ' -f1)"
   else
-    say "! no sha256sum or shasum on this system — skipping checksum verification"
-    return 0
+    die "no sha256sum or shasum on this system, so $asset cannot be verified.
+Install one of them, or bootstrap from peers instead:
+  sh install.sh --method pear"
   fi
 
   if ! fetch "$base/SHA256SUMS" "$TMPDIR_CASHME/SHA256SUMS"; then
-    say "! release publishes no SHA256SUMS — skipping checksum verification"
-    return 0
+    die "no SHA256SUMS published alongside $asset, so it cannot be verified.
+Refusing to install. Report it if it persists:
+  https://github.com/$REPO/issues"
   fi
 
   want="$(grep " \{1,2\}\*\{0,1\}$asset\$" "$TMPDIR_CASHME/SHA256SUMS" | cut -d' ' -f1)"
@@ -222,7 +227,17 @@ or: sudo sh -c 'CASHME_INSTALL_DIR=/usr/local/bin sh install.sh'"
   fi
   chmod 0755 "$BIN"
 
-  # macOS quarantines anything curl brought down; without this the first run is a dialog.
+  # Strip Gatekeeper's quarantine tag, so the first run is not a "cannot be opened because
+  # the developer cannot be verified" dialog.
+  #
+  # Usually there is no tag to strip: the attribute is set by the downloading application,
+  # and only ones declaring LSFileQuarantineEnabled set it — browsers and Mail do, curl and
+  # wget do not. So this is a no-op on the path above, and earns its place when the tarball
+  # came down through a browser and this script was pointed at it.
+  #
+  # Where there is a tag, what is being skipped is Apple's notarization check. The checksum
+  # verified above is then the only thing standing behind this binary, which is why that
+  # check fails closed rather than being skipped when it cannot be made.
   if [ "$(uname -s)" = Darwin ] && command -v xattr >/dev/null 2>&1; then
     xattr -d com.apple.quarantine "$BIN" >/dev/null 2>&1 || true
   fi
