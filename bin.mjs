@@ -19,7 +19,8 @@ import {
   nutzap,
   zap,
   withdraw,
-  restore
+  restore,
+  ui
 } from './lib/cli/commands.mjs'
 import { closeWallet } from './lib/cli/session.mjs'
 import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
@@ -32,6 +33,7 @@ import { run as runPending } from './lib/cli/pending.mjs'
 import { run as runNutzap } from './lib/cli/nutzap.mjs'
 import { run as runZap } from './lib/cli/zap.mjs'
 import { run as runRestore } from './lib/cli/restore.mjs'
+import { run as runTui } from './lib/cli/tui.mjs'
 import { note, flush } from './lib/notes.mjs'
 
 const debug = debuglog('cashme:app')
@@ -47,7 +49,8 @@ const handlers = new Map([
   [pending.name, runPending],
   [nutzap.name, runNutzap],
   [zap.name, runZap],
-  [restore.name, runRestore]
+  [restore.name, runRestore],
+  [ui.name, runTui]
 ])
 
 // A malformed command line throws out of parse() (see the bail handler in commands.mjs),
