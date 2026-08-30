@@ -23,6 +23,7 @@ import {
 } from './lib/cli/commands.mjs'
 import { closeWallet } from './lib/cli/session.mjs'
 import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
+import { configureNetwork, updaterBlocked, assertUnbound, proxyFailure } from './lib/net.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runWithdraw } from './lib/cli/withdraw.mjs'
@@ -67,6 +68,23 @@ if (root.flags.version) {
   Bare.exit()
 }
 
+// Where this run is allowed to reach the network from, before anything reaches it. A bad
+// proxy url or an interface this host does not have is a mistake in the command line, so it
+// stops the run here rather than halfway through a payment.
+try {
+  configureNetwork({ proxy: root.flags.proxy, iface: root.flags.interface })
+  // --interface can only be honoured on the hyperdht (see lib/net.mjs), and the command
+  // that was asked for already says whether that is where it is going. Said here, once,
+  // rather than as a mint request failing halfway through for a reason of ours.
+  const named = root.current
+  const overDht = (named?.name === get.name || named?.name === give.name) && named.flags.dht
+  if (named && !overDht) assertUnbound(`\`${appName} ${named.name}\``)
+} catch (err) {
+  note('[app:error]', err.message)
+  await flush()
+  Bare.exit(1)
+}
+
 const updates = root.flags.updates
 const storage = root.flags.storage || (isDev ? null : path.join(persistent(), appName))
 const dir = storage || path.join(os.tmpdir(), 'pear', appName)
@@ -87,7 +105,13 @@ if (root.flags.updater) {
 debug('updates:', updates === false ? 'disabled' : 'enabled')
 debug('storage path:', dir)
 
-if (updates !== false) {
+// The updater is a detached process that fetches over the hyperdht on its own, knowing
+// nothing of --proxy or --interface. Rather than let it go out on terms the run has just
+// been told not to use, it is left unstarted and said so.
+const blocked = updaterBlocked()
+if (updates !== false && blocked) {
+  note(`updates are off this run: the updater reaches the hyperdht, which ${blocked} rules out`)
+} else if (updates !== false) {
   try {
     spawnUpdater(dir, wait)
   } catch (err) {
@@ -106,8 +130,14 @@ try {
   }
 } catch (err) {
   // A locked wallet or an unreachable mint is something the user can act on: print what
-  // happened, not where.
-  note('[app:error]', err.message)
+  // happened, not where. A proxy that could not be reached arrives as somebody else's
+  // wording — coco's `Failed to fetch mint` — with ours behind it, and ours is the half
+  // that says what to do about it.
+  const proxied = proxyFailure(err)
+  note(
+    '[app:error]',
+    proxied && proxied !== err ? `${err.message}: ${proxied.message}` : err.message
+  )
   if (process.env.CASHME_DEBUG || debug.enabled) note(err.stack)
   Bare.exitCode = 1
 } finally {
