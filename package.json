@@ -1,7 +1,7 @@
 {
   "name": "cashme",
   "version": "0.3.0",
-  "description": "Cashu wallet as a standalone Bare process on Pear, with OTA updater support.",
+  "description": "A cashu wallet in your terminal, send and receive tokens privately over bluetooth.",
   "private": true,
   "bin": "bin.mjs",
   "upgrade": "pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o",
