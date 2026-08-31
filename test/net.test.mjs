@@ -23,8 +23,7 @@ import {
   networkPolicy,
   proxyFailure,
   proxyInForce,
-  interfaceInForce,
-  updaterBlocked
+  interfaceInForce
 } from '../lib/net.mjs'
 
 let counter = 0
@@ -113,7 +112,6 @@ test('--proxy picks the agent, and leaves the wires it was never going to carry 
   // The hyperdht and the local network were never http, so a proxy neither carries them nor
   // stops them: `give --dht` swaps at the mint through the proxy and hands over directly.
   t.alike(dhtOptions(), {}, 'a proxy binds nothing')
-  t.is(updaterBlocked(), '--proxy', 'but a proxy we were told to use stops the updater')
 })
 
 test('a proxy named for this wallet is exempt from no_proxy', (t) => {
@@ -139,7 +137,6 @@ test('the environment is read the way curl reads it', (t) => {
   t.is(networkPolicy().source, 'https_proxy')
   t.ok(agentFor('https://mint.example'))
   t.ok(agentFor('http://mint.example'))
-  t.is(updaterBlocked(), null, 'an inherited proxy is not a reason to stop the updater')
 })
 
 // The one thing Windows cannot be asked: its environment folds case, so HTTP_PROXY and
@@ -223,7 +220,6 @@ test('--dht-interface binds the hyperdht and leaves everything else alone', (t) 
   // It pins a socket the hyperdht opens. It is not a policy on anything else, so a request
   // that cannot be bound is made rather than refused — see the note bin.mjs prints instead.
   t.is(agentFor('https://mint.example'), null, 'and nothing about how a mint is reached')
-  t.is(updaterBlocked(), '--dht-interface 127.0.0.1', 'but the updater would break its one promise')
 })
 
 test('an interface this host does not have is a mistake in the command line', (t) => {
@@ -234,7 +230,6 @@ test('an interface this host does not have is a mistake in the command line', (t
 test('nothing is proxied or bound unless it was asked for', (t) => {
   t.teardown(clearNetwork)
   t.is(agentFor('https://mint.example'), null)
-  t.is(updaterBlocked(), null)
   t.alike(dhtOptions(), {})
   t.is(proxyInForce(), null)
   t.is(interfaceInForce(), null)

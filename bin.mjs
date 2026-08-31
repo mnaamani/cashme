@@ -23,13 +23,7 @@ import {
 } from './lib/cli/commands.mjs'
 import { closeWallet } from './lib/cli/session.mjs'
 import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
-import {
-  configureNetwork,
-  updaterBlocked,
-  proxyFailure,
-  proxyInForce,
-  interfaceInForce
-} from './lib/net.mjs'
+import { configureNetwork, proxyFailure, proxyInForce, interfaceInForce } from './lib/net.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runWithdraw } from './lib/cli/withdraw.mjs'
@@ -136,17 +130,12 @@ if (root.flags.updater) {
 debug('updates:', updates === false ? 'disabled' : 'enabled')
 debug('storage path:', dir)
 
-// The updater is a detached process that fetches over the hyperdht on its own, knowing
-// nothing of what this run was told. Rather than let it go out on terms the run did not
-// choose, it is left unstarted and said so — see updaterBlocked() for which flags stop it
-// and why a proxy inherited from the environment is not one of them.
-const blocked = updaterBlocked()
-if (updates !== false && blocked) {
-  note(
-    `updates are off this run: the updater reaches the hyperdht as a process of its own, ` +
-      `which ${blocked} does not cover`
-  )
-} else if (updates !== false) {
+// The updater is a detached process that fetches over the hyperdht, and inherits none of
+// this run's flags — so lib/updater.mjs forwards it the one that governs where its traffic
+// leaves from. Nothing else it does is covered by a flag here: a proxy cannot carry the
+// hyperdht any more than it can carry `give --dht`, which this run would have gone ahead
+// with too. `--no-updates` is how to say not to start it.
+if (updates !== false) {
   try {
     spawnUpdater(dir, wait)
   } catch (err) {

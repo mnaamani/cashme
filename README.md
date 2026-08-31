@@ -595,11 +595,9 @@ comma-separated list where `*` alone means every host, an entry matches the host
 domain under it (`local.com` covers `www.local.com`, not `www.notlocal.com`), and an entry
 may be an address or a CIDR block.
 
-Two ways this is deliberately not curl. `no_proxy` carves holes only in a proxy that came
-from the environment — a `--proxy` or `CASHME_PROXY` you named covers everything, because an
-ambient variable should not be able to punch a hole in a proxy you asked for by name. And
-only a proxy you named stops the OTA updater; one inherited from the environment says
-nothing about wanting background processes stopped, so it leaves it alone.
+One way this is deliberately not curl: `no_proxy` carves holes only in a proxy that came
+from the environment. A `--proxy` or `CASHME_PROXY` you named covers everything, because an
+ambient variable should not be able to punch a hole in a proxy you asked for by name.
 
 Every http and https request and every relay websocket then goes through the proxy: mint
 requests (coco's included), lightning address lookups, NIP-05 lookups, nostr relays.
@@ -636,11 +634,11 @@ The two flags cover different shapes of thing, and each is honest about its edge
   outgoing connection to a local address, so anything reaching a mint or a relay cannot be
   pinned to one. A command that never opens the hyperdht is not refused for that — the flag
   is simply inert, and the run says so rather than leaving you to assume it took.
-- **The OTA updater is skipped** under `--dht-interface`, and under a proxy you named. Of
-  the two it is `--dht-interface` whose promise the updater would really break: it is a
-  separate process that reaches the hyperdht — the very thing the flag pins — knowing
-  nothing about it, so rather than let it go out on terms this run did not choose, it is
-  left unstarted and said so.
+- **The OTA updater honours `--dht-interface` too.** It is a detached process that reaches
+  the hyperdht — the very thing the flag pins — and it inherits none of a run's flags, so
+  the run forwards that one to it by name and its swarm binds where you asked. Nothing else
+  it does is a flag's business: a proxy cannot carry the hyperdht any more than it can carry
+  `give --dht`. `--no-updates` is how to stop it running at all.
 
 Bluetooth and `give --print` touch no network at all, and neither flag changes them.
 

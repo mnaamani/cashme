@@ -4,20 +4,26 @@ const daemon = require('bare-daemon')
 const path = require('bare-path')
 const Corestore = require('corestore')
 const Hyperswarm = require('hyperswarm')
+const DHT = require('hyperdht')
 const PearRuntime = require('pear-runtime')
 const ReadyResource = require('ready-resource')
 
 module.exports = class App extends ReadyResource {
-  static spawnUpdater(dir, app, entrypoint, updateWindow) {
+  // `iface` is --dht-interface as it was typed, forwarded so the daemon binds where the run
+  // that started it was told to. It is the run's own spelling rather than the address it
+  // resolved to, so the daemon re-resolves it and says something useful if the interface has
+  // gone by the time it starts.
+  static spawnUpdater(dir, app, entrypoint, updateWindow, iface) {
     const args = entrypoint === null ? [] : [entrypoint]
     args.push('--updater', '--storage', dir)
     if (updateWindow !== undefined) {
       args.push('--update-window', String(updateWindow))
     }
+    if (iface) args.push('--dht-interface', iface)
     return daemon.spawn(app, args)
   }
 
-  constructor({ dir, app, updates, version, upgrade, name }) {
+  constructor({ dir, app, updates, version, upgrade, name, host = null }) {
     super()
 
     fs.mkdirSync(dir, { recursive: true })
@@ -28,6 +34,8 @@ module.exports = class App extends ReadyResource {
     this.version = version
     this.upgrade = upgrade
     this.name = name
+    // The local address the swarm's dht binds to, or null to let it bind 0.0.0.0.
+    this.host = host
 
     this.store = null
     this.swarm = null
@@ -39,7 +47,10 @@ module.exports = class App extends ReadyResource {
 
   async _open() {
     const store = new Corestore(path.join(this.dir, 'pear-runtime', 'corestore'))
-    const swarm = new Hyperswarm()
+    // Hyperswarm builds its own dht when not given one, and passes it no host — so pinning
+    // the updater to an address means constructing the node here. destroy() tears down a
+    // node it was handed exactly as one it made, so this changes nothing about shutdown.
+    const swarm = new Hyperswarm(this.host ? { dht: new DHT({ host: this.host }) } : {})
 
     this.store = store
     this.swarm = swarm
