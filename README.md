@@ -109,7 +109,8 @@ Until a release is staged, pear and npm users stay on whatever was seeded last w
 ## Usage
 
 `cashme` is a terminal cashu wallet. ecash tokens are exchanged directly between two
-devices over Bluetooth Low Energy (BLE) or the hyperdht, with no server in between — or
+devices over Bluetooth Low Energy (BLE), the local network or the hyperdht, with no server
+in between — or
 handed over as text or a QR code, for you to carry across whatever channel you trust.
 
 Run `cashme <command> --help` for any command, or `cashme --help` for the full list.
@@ -232,6 +233,34 @@ never acknowledges it, `cashme` tries to swap the proofs back right away; if the
 they are already spent, the receiver did get them after all, and the send stays in flight
 for `cashme pending` to settle.
 
+#### Over the local network
+
+Bluetooth reaches across a table; `--lan` reaches across a building, without leaving the
+network you are both already on. The same handover runs over a plain TCP link between the
+two machines, found by asking on the wire itself:
+
+```sh
+cashme give --lan --public-key a1b2c3 --amount 21
+```
+
+Short flag: `-l`. `--public-key` is again any prefix of the key the receiver's
+`cashme get --lan` prints — the sender multicasts "anyone listening?" to the LAN, a
+listening wallet answers with its key and a port, and the Noise handshake that follows
+proves the key really is theirs. So the beacon cannot lie you into paying somebody else,
+and a prefix long enough to be unambiguous in the room is enough to type.
+
+Nothing here leaves the LAN and nothing contacts a server: the discovery datagrams go out
+with a TTL of 1, so the first router drops them, and the link that carries the token is
+straight to an address that answered on it. It works with the internet down; it does not
+work between two people on different networks, which is what `--dht` is for. Guest wi-fi
+and VPNs that block multicast between clients will find nobody.
+
+The asking repeats every second, because multicast is dropped rather than retried, and
+gives up after 30 seconds. Silence that long means something you can act on — their `get`
+has stopped, you are not on the same network, or it does not pass multicast between
+clients — so the error names those rather than waiting on. If something answered but not
+under that key, it says so instead: the network is fine and the key is from an older run.
+
 #### Over the hyperdht
 
 Bluetooth reaches the room; `--dht` reaches anywhere. With it the same handover runs over
@@ -264,7 +293,7 @@ Everything else is as it is over bluetooth: the proofs are reserved first, Ctrl-
 them back, and the receiver's acknowledgement is what settles the send. A peer that is not
 listening fails within 30 seconds rather than waiting forever.
 
-Bluetooth and the hyperdht are not the only ways to hand a token over. `--print` writes it to stdout instead,
+The wires above are not the only ways to hand a token over. `--print` writes it to stdout instead,
 for you to carry over any channel you already trust — a private chat, a shared note —
 `--qr` also draws it for a mobile ecash wallet to scan, and `--copy` puts it on the system
 clipboard, ready to paste:
@@ -317,6 +346,20 @@ to swap it. So if that swap then fails — an unreachable mint, usually — the 
 is the only copy left, and `cashme` prints it rather than dropping it: keep it and claim it
 with `--token` once the mint is back.
 
+To be paid from across the building rather than across the table, listen on the local
+network instead:
+
+```sh
+cashme get --lan
+```
+
+The key it prints is new every run, like the bluetooth one, and the sender needs the
+current one — any prefix of it. Nothing is announced while this waits: it answers senders
+that ask and says nothing otherwise. Anyone on that network can ask, though, so while it is
+listening, everyone on the wi-fi can see that a wallet here is waiting to be paid — which
+is worth knowing on a network you do not control. The key is that run's alone, so what they
+learn is that somebody is listening now, not which wallet it is.
+
 To be paid from anywhere rather than from the room, listen on the hyperdht instead:
 
 ```sh
@@ -345,8 +388,9 @@ but it is a lasting public identifier for the wallet — worth it for a key you 
 once, not for a one-off payment from a stranger.
 
 Short flag: `-s`. Which kind of key is in use is printed above it either way. `give --dht`
-takes the same flag, for the key it presents to the receiver. On bluetooth it is redundant
-on both commands and says so: those keys are new every run already.
+takes the same flag, for the key it presents to the receiver. On bluetooth and on the local
+network it is redundant on both commands and says so: those keys are new every run already.
+`--lan` and `--dht` together are refused rather than one quietly winning.
 
 A token from somewhere else — a `give --print`, a QR, a message — is claimed on the spot,
 and the command exits rather than listening:
@@ -357,9 +401,9 @@ cashme get < token.txt
 pbpaste | cashme get
 ```
 
-Short flags: `-t`, `-b`, `-d`, `-e`. Stdin is read whenever it is not a terminal, or on
-`--token -` — which includes a script or a service, where there is no terminal and nobody
-typing either. `--bluetooth` or `--dht` says to listen regardless.
+Short flags: `-t`, `-b`, `-l`, `-d`, `-s`. Stdin is read whenever it is not a terminal, or
+on `--token -` — which includes a script or a service, where there is no terminal and
+nobody typing either. `--bluetooth`, `--lan` or `--dht` says to listen regardless.
 
 ### pending
 
@@ -646,11 +690,13 @@ everything a run says about itself goes — stdout carries only what a command p
 `deposit` and `give --print` can be piped straight into something else.
 
 Sections are `cashme:app` (startup, storage), `cashme:ble` (bluetooth swarm, connections,
-token transfer) and `cashme:dht` (hyperdht connect, teardown, and the same transfer):
+token transfer), `cashme:lan` (multicast beacons, the TCP link, and the same transfer) and
+`cashme:dht` (hyperdht connect, teardown, and the same transfer):
 
 ```sh
 BARE_DEBUG=cashme:* cashme get
 BARE_DEBUG=cashme:ble cashme give -k <pubkey> -a 10
+BARE_DEBUG=cashme:lan cashme give --lan -k <pubkey> -a 10
 BARE_DEBUG=cashme:dht cashme give --dht -k <pubkey> -a 10
 ```
 
@@ -696,11 +742,12 @@ npm start -- --no-updates
 - `bin.mjs` - entrypoint: argv, storage directory, dispatch
 - `lib/cli/` - one module per command, plus the flag grammar (`commands.mjs`), the wallet's
   lifetime and Ctrl-C handling (`session.mjs`), the hyperdht key a run presents
-  (`address.mjs`) and the printing (`ui.mjs`)
+  (`address.mjs`), which wire a run uses (`transport.mjs`) and the printing (`ui.mjs`)
 - `lib/manager.mjs` - opens the coco wallet and drives the deposit/send/receive/restore flows
 - `lib/coco-store.mjs` - coco `Repositories` adapter for Bare: persistence, rollback, locking
-- `lib/token-wire.mjs` - the frames a token travels in, shared by both transports
+- `lib/token-wire.mjs` - the frames a token travels in, shared by all three transports
 - `lib/ble.mjs` - bluetooth transport for handing a token to a neighbour
+- `lib/lan.mjs` - local-network transport: multicast discovery, then a TCP link
 - `lib/dht.mjs` - hyperdht transport for handing a token to a peer anywhere
 - `lib/clipboard.mjs` - the platform's clipboard program, for `give --copy`
 - `lib/notes.mjs` - the one stderr write path, and the flush a run exits through

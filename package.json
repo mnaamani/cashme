@@ -1,7 +1,7 @@
 {
   "name": "cashme",
   "version": "0.3.0",
-  "description": "Cashu wallet as a standalone Bare process on Pear, with OTA updater support.",
+  "description": "A cashu wallet in your terminal, send and receive tokens privately over bluetooth.",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@cashu/coco-core": "^2.0.0",
+    "@hyperswarm/secret-stream": "^6.9.1",
     "@noble/curves": "^2.3.0",
     "@noble/hashes": "^2.3.0",
     "@scure/base": "^2.3.0",
@@ -46,6 +47,7 @@
     "bare-socks-proxy-agent": "^0.1.0",
     "bare-storage": "^1.1.0",
     "bare-subprocess": "^5.2.3",
+    "bare-tcp": "^2.5.0",
     "bare-tty": "^5.1.0",
     "bare-url": "^2.5.2",
     "bare-ws": "^3.0.0",
@@ -61,6 +63,7 @@
     "pear-runtime": "^1.1.4",
     "protomux": "^3.11.0",
     "ready-resource": "^1.2.0",
+    "udx-native": "^1.20.6",
     "uqr": "^0.1.3",
     "which-runtime": "^1.4.0"
   },
