@@ -23,7 +23,13 @@ import {
 } from './lib/cli/commands.mjs'
 import { closeWallet } from './lib/cli/session.mjs'
 import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
-import { configureNetwork, updaterBlocked, assertUnbound, proxyFailure } from './lib/net.mjs'
+import {
+  configureNetwork,
+  updaterBlocked,
+  assertUnbound,
+  proxyFailure,
+  proxyInForce
+} from './lib/net.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runWithdraw } from './lib/cli/withdraw.mjs'
@@ -77,8 +83,19 @@ try {
   // that was asked for already says whether that is where it is going. Said here, once,
   // rather than as a mint request failing halfway through for a reason of ours.
   const named = root.current
-  const overDht = (named?.name === get.name || named?.name === give.name) && named.flags.dht
+  const handover = named?.name === get.name || named?.name === give.name
+  const overDht = handover && named.flags.dht
   if (named && !overDht) assertUnbound(`\`${appName} ${named.name}\``)
+
+  // A proxy carries what a proxy can carry. Neither the hyperdht nor the local network
+  // handover is http, so neither goes through it — and that is the command working as
+  // asked, not a flag being ignored: the mint swap behind the handover is proxied all the
+  // same. Said once, here, so nobody has to guess which half went where.
+  const via = proxyInForce()
+  if (via && (overDht || (handover && named.flags.lan))) {
+    const wire = overDht ? 'the hyperdht' : 'the local network'
+    note(`${via.source} carries the mint and relay traffic; the handover over ${wire} is direct`)
+  }
 } catch (err) {
   note('[app:error]', err.message)
   await flush()
@@ -106,11 +123,15 @@ debug('updates:', updates === false ? 'disabled' : 'enabled')
 debug('storage path:', dir)
 
 // The updater is a detached process that fetches over the hyperdht on its own, knowing
-// nothing of --proxy or --interface. Rather than let it go out on terms the run has just
-// been told not to use, it is left unstarted and said so.
+// nothing of what this run was told. Rather than let it go out on terms the run did not
+// choose, it is left unstarted and said so — see updaterBlocked() for which flags stop it
+// and why a proxy inherited from the environment is not one of them.
 const blocked = updaterBlocked()
 if (updates !== false && blocked) {
-  note(`updates are off this run: the updater reaches the hyperdht, which ${blocked} rules out`)
+  note(
+    `updates are off this run: the updater reaches the hyperdht as a process of its own, ` +
+      `which ${blocked} does not cover`
+  )
 } else if (updates !== false) {
   try {
     spawnUpdater(dir, wait)

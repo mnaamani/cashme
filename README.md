@@ -576,6 +576,31 @@ cashme --proxy socks5://user:pass@127.0.0.1:1080 zap -p npub1... -s 21
 export CASHME_PROXY=socks5://127.0.0.1:9050             # or set it once for every run
 ```
 
+Failing both of those, the environment is read the way curl reads it, so a machine already
+set up for a proxy needs nothing said here:
+
+```sh
+export https_proxy=socks5://127.0.0.1:9050   # https, wss, and anything ALL_PROXY would cover
+export http_proxy=http://proxy.lan:3128      # http and ws
+export ALL_PROXY=socks5://127.0.0.1:9050     # both, when neither of the above is set
+export no_proxy=localhost,127.0.0.1,.lan     # hosts to reach directly anyway
+```
+
+The convention in full: the lower case spelling wins where both are set, `ALL_PROXY` is the
+fallback for a scheme with no proxy of its own, and a value may be written `host:port` with
+no scheme, which means `http://`. `http_proxy` is read in **lower case only** — under CGI a
+request header `Proxy:` arrives as `HTTP_PROXY` in the environment, so honouring the upper
+case spelling would let whoever sent the request choose the proxy. `no_proxy` is a
+comma-separated list where `*` alone means every host, an entry matches the hostname or any
+domain under it (`local.com` covers `www.local.com`, not `www.notlocal.com`), and an entry
+may be an address or a CIDR block.
+
+Two ways this is deliberately not curl. `no_proxy` carves holes only in a proxy that came
+from the environment — a `--proxy` or `CASHME_PROXY` you named covers everything, because an
+ambient variable should not be able to punch a hole in a proxy you asked for by name. And
+only a proxy you named stops the OTA updater; one inherited from the environment says
+nothing about wanting background processes stopped, so it leaves it alone.
+
 Every http and https request and every relay websocket then goes through the proxy: mint
 requests (coco's included), lightning address lookups, NIP-05 lookups, nostr relays.
 Hostnames are handed to the proxy as written and resolved there, so no DNS query for a mint
@@ -592,18 +617,23 @@ cashme --interface en0 get --dht
 cashme --interface 10.8.0.2 give --dht -k <key> -a 21
 ```
 
-Both flags are honest about what they cannot do, and stop rather than go out on terms that
-were not asked for:
+The two flags cover different shapes of thing, and each is honest about its edge:
 
-- **`--proxy` cannot carry the hyperdht.** `give --dht` and `get --dht` holepunch over UDP,
-  which a SOCKS5 or CONNECT proxy does not forward. Asking for both stops the run. Hand the
-  token over another way — bluetooth, or `give --print` — or drop `--proxy`.
+- **A proxy covers a protocol, not a run.** It carries http, https and the relay
+  websockets. It does not carry the hyperdht, which holepunches over UDP, nor `--lan`, which
+  finds its peer by multicast — there is nothing there for a proxy to carry, and never was.
+  So `give --dht` behind a proxy is a mint swap through the proxy and a token handed over
+  the hyperdht directly, which is what was asked for. The run prints a line saying which
+  half went where. To keep the handover off the internet as well, use bluetooth, `--lan` or
+  `give --print`.
 - **`--interface` holds for the hyperdht only.** Bare's TCP stack has no way to bind an
   outgoing connection to a local address, so anything that reaches a mint or a relay cannot
-  be pinned to one. A command that would is refused rather than quietly sent out from
-  whichever address the routing table picked.
-- **The OTA updater is skipped** under either flag. It is a separate process that fetches
-  over the hyperdht knowing nothing of them, so the run says so and leaves it unstarted.
+  be pinned to one. Here there _is_ something to pin and no way to pin it, so a command that
+  would have to ignore the flag is refused rather than quietly sent out from whichever
+  address the routing table picked.
+- **The OTA updater is skipped** under `--interface`, and under a proxy you named. It is a
+  separate process that fetches over the hyperdht knowing nothing of either, so rather than
+  let it go out on terms this run did not choose, it is left unstarted and said so.
 
 Bluetooth and `give --print` touch no network at all, and neither flag changes them.
 
