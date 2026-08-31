@@ -9,6 +9,7 @@ import '../lib/polyfills.mjs'
 import test from 'brittle'
 import process from 'bare-process'
 import { dhtIdentity, warnStable } from '../lib/cli/address.mjs'
+import { transportFrom, BLE, LAN, DHT } from '../lib/cli/transport.mjs'
 import { dhtAddress } from '../lib/dht.mjs'
 import { seedFromHex } from '../lib/seed.mjs'
 import { give, get, root } from '../lib/cli/commands.mjs'
@@ -94,22 +95,35 @@ test('a run says which kind of key it is on', (t) => {
   )
 })
 
-test('--stable on bluetooth is called redundant rather than ignored', (t) => {
-  t.ok(/redundant/.test(said(() => warnStable({ stable: true }))))
+test('--stable off the hyperdht is called redundant rather than ignored', (t) => {
+  t.ok(/redundant/.test(said(() => warnStable({ stable: true }, BLE))))
+  t.ok(
+    /local network/.test(said(() => warnStable({ stable: true }, LAN))),
+    'and names the wire it is redundant on'
+  )
   t.is(
-    said(() => warnStable({ stable: true, dht: true })),
+    said(() => warnStable({ stable: true }, DHT)),
     '',
     'it does something with --dht'
   )
   t.is(
-    said(() => warnStable({ dht: true })),
+    said(() => warnStable({}, DHT)),
     '',
     'and unasked for, there is nothing to say'
   )
   t.is(
-    said(() => warnStable({})),
+    said(() => warnStable({}, BLE)),
     ''
   )
+})
+
+// Which wire a run uses is read the same way by both commands, and the two network flags
+// are a contradiction rather than a precedence.
+test('the transport is the flag that was passed, and only one may be', (t) => {
+  t.is(transportFrom({}), BLE, 'bluetooth needs nothing but the room')
+  t.is(transportFrom({ lan: true }), LAN)
+  t.is(transportFrom({ dht: true }), DHT)
+  t.exception(() => transportFrom({ dht: true, lan: true }), /pass one of them/)
 })
 
 // The flag itself, as typed. `flags.stable` is what every check above reads, so a short
