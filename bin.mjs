@@ -79,9 +79,11 @@ if (root.flags.version) {
 // stops the run here rather than halfway through a payment.
 try {
   configureNetwork({ proxy: root.flags.proxy, iface: root.flags.interface })
-  // --interface can only be honoured on the hyperdht (see lib/net.mjs), and the command
-  // that was asked for already says whether that is where it is going. Said here, once,
-  // rather than as a mint request failing halfway through for a reason of ours.
+  // --interface can only be honoured on the hyperdht (see lib/net.mjs), and the command that
+  // was asked for already says whether that is where it is going. Said here, before the
+  // command runs, rather than as a mint request failing halfway through for a reason of
+  // ours — the guards further in are what catch a socket opened somewhere this does not
+  // know about.
   const named = root.current
   const handover = named?.name === get.name || named?.name === give.name
   const overDht = handover && named.flags.dht
