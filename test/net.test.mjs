@@ -172,7 +172,10 @@ test('ALL_PROXY covers a scheme with no proxy of its own', (t) => {
   t.teardown(withEnv({ ALL_PROXY: 'socks5://127.0.0.1:1080' }))
   t.teardown(clearNetwork)
   configureNetwork({})
-  t.is(networkPolicy().source, 'ALL_PROXY')
+  // Which spelling it came from is not knowable on windows, where the two are one variable
+  // and `spelling()` reports whichever it looks up first. That it is the fallback rather
+  // than a scheme's own proxy is the whole of what this asserts.
+  t.is(networkPolicy().source.toLowerCase(), 'all_proxy')
   t.ok(agentFor('https://mint.example'))
   t.ok(agentFor('http://mint.example'))
 })
