@@ -557,7 +557,96 @@ cashme --version                      # print the version
 cashme --storage ./wallet balance     # use a specific storage directory
 cashme --no-updates balance           # skip the OTA updater for this run
 cashme --update-window 60000 balance  # how long the updater waits, in ms
+cashme --proxy socks5://127.0.0.1:9050 deposit -a 100   # go out through a proxy
+cashme --dht-interface en0 get --dht  # pin the hyperdht to one local address
 ```
+
+### Where the traffic goes
+
+The commands default to giving away as little as they can — one-run keys, no reusable
+address, nothing announced unless asked for. What they cannot hide by themselves is the IP
+address the packets leave from: a mint sees where its user is, and so does a relay, an
+lnurl host and a NIP-05 domain. `--proxy` is how to change that.
+
+```sh
+cashme --proxy socks5://127.0.0.1:9050 balance          # tor
+cashme --proxy socks5h://127.0.0.1:1080 deposit -a 100  # the same thing, spelled the other way
+cashme --proxy http://proxy.lan:3128 restore            # a CONNECT proxy
+cashme --proxy socks5://user:pass@127.0.0.1:1080 zap -p npub1... -s 21
+export CASHME_PROXY=socks5://127.0.0.1:9050             # or set it once for every run
+```
+
+Failing both of those, the environment is read the way curl reads it, so a machine already
+set up for a proxy needs nothing said here:
+
+```sh
+export https_proxy=socks5://127.0.0.1:9050   # https, wss, and anything ALL_PROXY would cover
+export http_proxy=http://proxy.lan:3128      # http and ws
+export ALL_PROXY=socks5://127.0.0.1:9050     # both, when neither of the above is set
+export no_proxy=localhost,127.0.0.1,.lan     # hosts to reach directly anyway
+```
+
+The convention in full: the lower case spelling wins where both are set, `ALL_PROXY` is the
+fallback for a scheme with no proxy of its own, and a value may be written `host:port` with
+no scheme, which means `http://`. `http_proxy` is read in **lower case only** — under CGI a
+request header `Proxy:` arrives as `HTTP_PROXY` in the environment, so honouring the upper
+case spelling would let whoever sent the request choose the proxy. `no_proxy` is a
+comma-separated list where `*` alone means every host, an entry matches the hostname or any
+domain under it (`local.com` covers `www.local.com`, not `www.notlocal.com`), and an entry
+may be an address or a CIDR block.
+
+One way this is deliberately not curl: `no_proxy` carves holes only in a proxy that came
+from the environment. A `--proxy` or `CASHME_PROXY` you named covers everything, because an
+ambient variable should not be able to punch a hole in a proxy you asked for by name.
+
+Every http request the wallet makes is given 30 seconds to be answered, proxy or no proxy.
+Bare's fetch has no deadline of its own, so a mint that accepts a connection and then says
+nothing would otherwise hold a command there indefinitely — mid-`give`, with the proofs
+already reserved and nothing on screen to say why. The limit is per request, not per command,
+so waiting out a lightning invoice is unaffected: each poll is its own request.
+
+Every http and https request and every relay websocket then goes through the proxy: mint
+requests (coco's included), lightning address lookups, NIP-05 lookups, nostr relays.
+Hostnames are handed to the proxy as written and resolved there, so no DNS query for a mint
+leaves this machine either — what `socks5h://` means elsewhere, and what both socks schemes
+do here. TLS is still end to end: the proxy carries the ciphertext and reads no more of it
+than any other hop. `socks5://`, `socks5h://`, `http://` and `https://` proxies are
+supported, with a username and password in the url when the proxy wants one.
+
+`--dht-interface` sends the hyperdht out from one local address, named either by interface
+or by the address itself:
+
+```sh
+cashme --dht-interface en0 get --dht
+cashme --dht-interface 10.8.0.2 give --dht -k <key> -a 21
+```
+
+It is named for what it reaches. Binding a socket to a local address is something the
+hyperdht's sockets can do and an outgoing TCP connection in Bare cannot, so mint and relay
+traffic is not pinned by it and never was — `--proxy` is the flag for changing what a mint
+sees. It is not `--udp-interface` either: `--lan` discovery is UDP as well and is not pinned,
+for the reason in the header of `lib/lan.mjs`.
+
+The two flags cover different shapes of thing, and each is honest about its edge:
+
+- **A proxy covers a protocol, not a run.** It carries http, https and the relay
+  websockets. It does not carry the hyperdht, which holepunches over UDP, nor `--lan`, which
+  finds its peer by multicast — there is nothing there for a proxy to carry, and never was.
+  So `give --dht` behind a proxy is a mint swap through the proxy and a token handed over
+  the hyperdht directly, which is what was asked for. The run prints a line saying which
+  half went where. To keep the handover off the internet as well, use bluetooth, `--lan` or
+  `give --print`.
+- **`--dht-interface` holds for the hyperdht only.** Bare's TCP stack has no way to bind an
+  outgoing connection to a local address, so anything reaching a mint or a relay cannot be
+  pinned to one. A command that never opens the hyperdht is not refused for that — the flag
+  is simply inert, and the run says so rather than leaving you to assume it took.
+- **The OTA updater honours `--dht-interface` too.** It is a detached process that reaches
+  the hyperdht — the very thing the flag pins — and it inherits none of a run's flags, so
+  the run forwards that one to it by name and its swarm binds where you asked. Nothing else
+  it does is a flag's business: a proxy cannot carry the hyperdht any more than it can carry
+  `give --dht`. `--no-updates` is how to stop it running at all.
+
+Bluetooth and `give --print` touch no network at all, and neither flag changes them.
 
 ## The wallet on disk
 
@@ -579,6 +668,24 @@ crash and is ignored. The directory is created `0700`.
 The wallet itself is [coco](https://github.com/cashubtc/coco) (`@cashu/coco-core`), stored
 through a Bare adapter in `lib/coco-store.mjs` — coco's published adapters are SQLite,
 IndexedDB and expo-sqlite, none of which run under Bare.
+
+## Packages
+
+The proxy support lives in three packages of its own under `packages/`, because none of it
+is about ecash and Bare had no proxy agent of any kind. They are workspaces of this repo for
+now, and are meant to be extracted into their own repositories once they have settled:
+
+- `packages/bare-proxy-agent` - the half every proxy protocol shares: a socket opened by
+  handshake rather than by connecting, the bare-http1 agents built on it, and the reading
+  and error types a handshake is written against
+- `packages/bare-socks-proxy-agent` - SOCKS5 (RFC 1928, and RFC 1929 for credentials), with
+  the target name resolved by the proxy
+- `packages/bare-https-proxy-agent` - HTTP CONNECT, over a plain or a TLS first hop
+
+Nothing in the Node ecosystem could be used instead: `socks-proxy-agent` and friends are
+built on `agent-base` and Node's `net`/`tls`/`http`, none of which Bare has, and bare-http1's
+agent is a different contract from Node's. Each package has its own tests
+(`npm run test:packages`, or `npm test` inside one).
 
 ## Development
 
@@ -655,11 +762,12 @@ npm start -- --no-updates
 
 - `npm start` - run the Bare Process in dev mode (`bare bin.mjs --no-updates`)
 - `npm test` - run the unit suite (fast, no network)
+- `npm run test:packages` - run the test suite of each package under `packages/`
 - `npm run test:integration` - run the integration suite: the wallet against a real mint,
   and the nostr code against a relay the tests control. Needs the network.
   `CASHME_TEST_OFFLINE=1` skips the parts that spend, leaving the local ones;
   `CASHME_TEST_MINT=<url>` points them at another mint.
-- `npm run test:all` - both suites
+- `npm run test:all` - all three suites
 - `npm run lint` - run prettier check and lunte
 - `npm run format` - format repository with prettier
 - `npm run make` - auto-detect host OS/arch and run matching build target
@@ -691,6 +799,8 @@ npm start -- --no-updates
 - `lib/mint-url.mjs` - canonical mint urls, and the validation coco's normalizer leaves out
 - `lib/lock.mjs` - advisory lock, one instance per storage directory
 - `lib/updater.mjs` - OTA updates: spawning the daemon, and being it
+- `lib/net.mjs` - the network policy a run is under: `--proxy`, `--dht-interface`, and what
+  each of them refuses to half-apply
 - `lib/constants.mjs`, `lib/polyfills.mjs` - defaults, and the browser globals Bare lacks
 - `app.js` - daemon launcher and updater resource
 - `scripts/make.js` - platform/arch build target selector
@@ -701,6 +811,8 @@ npm start -- --no-updates
 - `test/mint-url.test.mjs` - mint url normalization and validation
 - `test/nostr.test.mjs` - npub decoding and NIP-01 event ids and signatures
 - `test/lnurl.test.mjs` - lnurl address/bech32 handling and the bolt11 amount check
+- `test/net.test.mjs` - the network policy, and a request driven through a proxy of the
+  test's own
 - `test/integration/index.js` - integration entrypoint, requiring the suites below
 - `test/integration/helpers.mjs` - throwaway wallets, running the real CLI, and a stub relay
 - `test/integration/relay.test.mjs` - what the wallet does with a relay that lies

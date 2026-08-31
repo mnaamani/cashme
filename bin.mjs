@@ -23,6 +23,7 @@ import {
 } from './lib/cli/commands.mjs'
 import { closeWallet } from './lib/cli/session.mjs'
 import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
+import { configureNetwork, proxyFailure, proxyInForce, interfaceInForce } from './lib/net.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runWithdraw } from './lib/cli/withdraw.mjs'
@@ -67,6 +68,48 @@ if (root.flags.version) {
   Bare.exit()
 }
 
+// Where this run is allowed to reach the network from, before anything reaches it. A bad
+// proxy url or an interface this host does not have is a mistake in the command line, so it
+// stops the run here rather than halfway through a payment.
+try {
+  configureNetwork({ proxy: root.flags.proxy, iface: root.flags.dhtInterface })
+  const named = root.current
+  const handover = named?.name === get.name || named?.name === give.name
+  const overDht = handover && named.flags.dht
+
+  // Both flags cover part of a run rather than all of it, and neither refuses a command for
+  // the part it cannot reach. What they do instead is say so, here, once, before anything
+  // goes out — so nobody has to guess which half went where.
+
+  // A proxy carries what a proxy can carry. Neither the hyperdht nor the local network
+  // handover is http, so neither goes through it, and that is the command working as asked:
+  // the mint swap behind the handover is proxied all the same.
+  const via = proxyInForce()
+  if (via && (overDht || (handover && named.flags.lan))) {
+    const wire = overDht ? 'the hyperdht' : 'the local network'
+    note(`${via.source} carries the mint and relay traffic; the handover over ${wire} is direct`)
+  }
+
+  // --dht-interface reaches the hyperdht and nothing else, so on a command that never opens
+  // it the flag is inert, and on one that does it still leaves the mint traffic to the
+  // routing table. Both are worth a line: a flag reached for and silently doing nothing is
+  // the same surprise as one silently doing too little.
+  const pinned = interfaceInForce()
+  if (named && pinned) {
+    note(
+      overDht
+        ? `--dht-interface ${pinned} pins the handover; the mint traffic behind it goes out ` +
+            'by the routing table'
+        : `--dht-interface ${pinned} does nothing here: \`${appName} ${named.name}\` never ` +
+            'opens the hyperdht'
+    )
+  }
+} catch (err) {
+  note('[app:error]', err.message)
+  await flush()
+  Bare.exit(1)
+}
+
 const updates = root.flags.updates
 const storage = root.flags.storage || (isDev ? null : path.join(persistent(), appName))
 const dir = storage || path.join(os.tmpdir(), 'pear', appName)
@@ -87,6 +130,11 @@ if (root.flags.updater) {
 debug('updates:', updates === false ? 'disabled' : 'enabled')
 debug('storage path:', dir)
 
+// The updater is a detached process that fetches over the hyperdht, and inherits none of
+// this run's flags — so lib/updater.mjs forwards it the one that governs where its traffic
+// leaves from. Nothing else it does is covered by a flag here: a proxy cannot carry the
+// hyperdht any more than it can carry `give --dht`, which this run would have gone ahead
+// with too. `--no-updates` is how to say not to start it.
 if (updates !== false) {
   try {
     spawnUpdater(dir, wait)
@@ -106,8 +154,14 @@ try {
   }
 } catch (err) {
   // A locked wallet or an unreachable mint is something the user can act on: print what
-  // happened, not where.
-  note('[app:error]', err.message)
+  // happened, not where. A proxy that could not be reached arrives as somebody else's
+  // wording — coco's `Failed to fetch mint` — with ours behind it, and ours is the half
+  // that says what to do about it.
+  const proxied = proxyFailure(err)
+  note(
+    '[app:error]',
+    proxied && proxied !== err ? `${err.message}: ${proxied.message}` : err.message
+  )
   if (process.env.CASHME_DEBUG || debug.enabled) note(err.stack)
   Bare.exitCode = 1
 } finally {
