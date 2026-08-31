@@ -66,6 +66,40 @@ test('a proxy that cannot be reached says so, not "Network error"', async (t) =>
   t.ok(reason?.message.includes(`127.0.0.1:${port}`), 'and it says which proxy')
 })
 
+// The shape that hangs CI: a host that accepts the connection and then says nothing. Bare's
+// fetch waits on that for as long as the host cares to hold it, so without a deadline of our
+// own `give` sits there with the proofs reserved and nothing on screen to say why.
+test('a host that accepts and then says nothing is given up on', async (t) => {
+  t.teardown(clearNetwork)
+  // Accepts, reads the request, never writes a byte back.
+  const port = await listener(t, () => {})
+  configureNetwork({ requestTimeout: 150 })
+
+  const started = Date.now()
+  let failure = null
+  try {
+    await fetch(`http://127.0.0.1:${port}/v1/swap`)
+  } catch (err) {
+    failure = err
+  }
+
+  t.ok(failure, 'the request ends rather than hanging')
+  t.is(failure?.code, 'REQUEST_TIMEOUT', 'and says it was us who stopped it')
+  t.ok(failure?.message.includes(`127.0.0.1:${port}`), 'naming the host that went quiet')
+  t.ok(Date.now() - started < 5000, 'at roughly the deadline, not whenever the host feels like it')
+})
+
+test('a request that answers is not stopped, and leaves no timer behind', async (t) => {
+  t.teardown(clearNetwork)
+  const origin = await server(t)
+  configureNetwork({ requestTimeout: 150 })
+
+  // Well inside the deadline. The point is the other half: a cleared timer, so the loop is
+  // not held open by a deadline for a request that already came back.
+  const response = await fetch(`http://127.0.0.1:${origin.port}/hello`)
+  t.is(await response.text(), 'hello from the origin')
+})
+
 test('a proxy failure is found again under a library that rewrapped it', (t) => {
   t.teardown(clearNetwork)
   configureNetwork({ proxy: 'socks5://127.0.0.1:9050' })

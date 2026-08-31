@@ -599,6 +599,12 @@ One way this is deliberately not curl: `no_proxy` carves holes only in a proxy t
 from the environment. A `--proxy` or `CASHME_PROXY` you named covers everything, because an
 ambient variable should not be able to punch a hole in a proxy you asked for by name.
 
+Every http request the wallet makes is given 30 seconds to be answered, proxy or no proxy.
+Bare's fetch has no deadline of its own, so a mint that accepts a connection and then says
+nothing would otherwise hold a command there indefinitely — mid-`give`, with the proofs
+already reserved and nothing on screen to say why. The limit is per request, not per command,
+so waiting out a lightning invoice is unaffected: each poll is its own request.
+
 Every http and https request and every relay websocket then goes through the proxy: mint
 requests (coco's included), lightning address lookups, NIP-05 lookups, nostr relays.
 Hostnames are handed to the proxy as written and resolved there, so no DNS query for a mint
