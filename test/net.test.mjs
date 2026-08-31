@@ -8,7 +8,9 @@ import '../lib/polyfills.mjs'
 import test from 'brittle'
 import tcp from 'bare-tcp'
 import http from 'bare-http1'
+import { proxyErrorIn } from 'bare-proxy-agent'
 import process from 'bare-process'
+import { isWindows } from 'which-runtime'
 import os from 'bare-os'
 import fs from 'bare-fs'
 import path from 'bare-path'
@@ -47,7 +49,22 @@ test('a proxy that cannot be reached says so, not "Network error"', async (t) =>
   const port = await listener(t, (socket) => socket.destroy())
   configureNetwork({ proxy: `socks5://127.0.0.1:${port}` })
 
-  await t.exception(fetch('https://mint.example/v1/info'), /closed the connection/)
+  // What is being checked is that the proxy is named as the reason, rather than buried
+  // under bare-fetch's `NETWORK_ERROR: Network error`. Not how it is phrased: a proxy that
+  // accepts and then drops us sends a FIN on Linux and macOS, read as a clean close, and a
+  // reset on Windows, read as an error — one event the operating system reports two ways,
+  // and the reader (packages/bare-proxy-agent/lib/reader.mjs) has different words for each.
+  // Pinning either wording here only pins the platform this ran on.
+  let failure = null
+  try {
+    await fetch('https://mint.example/v1/info')
+  } catch (err) {
+    failure = err
+  }
+  t.ok(failure, 'the request fails')
+  const reason = proxyErrorIn(failure)
+  t.is(reason?.code, 'PROXY_ERROR', 'the proxy is the reason, not "Network error"')
+  t.ok(reason?.message.includes(`127.0.0.1:${port}`), 'and it says which proxy')
 })
 
 test('a proxy failure is found again under a library that rewrapped it', (t) => {
@@ -112,8 +129,7 @@ test('the environment is read the way curl reads it', (t) => {
   t.teardown(
     withEnv({
       https_proxy: 'socks5://127.0.0.1:1080',
-      http_proxy: 'http://proxy.lan:3128',
-      HTTP_PROXY: 'socks5://attacker.example:9050'
+      http_proxy: 'http://proxy.lan:3128'
     })
   )
   t.teardown(clearNetwork)
@@ -126,35 +142,37 @@ test('the environment is read the way curl reads it', (t) => {
   t.is(updaterBlocked(), null, 'an inherited proxy is not a reason to stop the updater')
 })
 
-test('http_proxy is read in lower case only, so a Proxy: header cannot set it', (t) => {
-  t.teardown(withEnv({ HTTP_PROXY: 'socks5://attacker.example:9050' }))
-  t.teardown(clearNetwork)
-  configureNetwork({})
+// The one thing Windows cannot be asked: its environment folds case, so HTTP_PROXY and
+// http_proxy are a single variable and there is no upper case spelling to ignore. curl
+// documents the same hole. What the mitigation is for — a CGI process reading a `Proxy:`
+// request header out of its environment — is not a shape this wallet is ever run in, so the
+// platform where it cannot be tested is also the one where it does not arise.
+test(
+  'http_proxy is read in lower case only, so a Proxy: header cannot set it',
+  { skip: isWindows },
+  (t) => {
+    t.teardown(withEnv({ HTTP_PROXY: 'socks5://attacker.example:9050' }))
+    t.teardown(clearNetwork)
+    configureNetwork({})
 
-  t.is(agentFor('http://mint.example'), null, 'the upper case spelling is ignored')
-  t.is(networkPolicy().proxyName, null)
-})
+    t.is(agentFor('http://mint.example'), null, 'the upper case spelling is ignored')
+    t.is(networkPolicy().proxyName, null)
+  }
+)
 
-test('the lower case spelling wins, and ALL_PROXY is the fallback', (t) => {
-  t.teardown(
-    withEnv({
-      https_proxy: 'socks5://127.0.0.1:1080',
-      HTTPS_PROXY: 'socks5://x:9',
-      ALL_PROXY: ''
-    })
-  )
+// Two spellings of one name is a thing only a case-sensitive environment has.
+test('the lower case spelling wins where a name has two', { skip: isWindows }, (t) => {
+  t.teardown(withEnv({ https_proxy: 'socks5://127.0.0.1:1080', HTTPS_PROXY: 'socks5://x:9' }))
   t.teardown(clearNetwork)
   configureNetwork({})
   t.is(networkPolicy().proxyName, 'socks5://127.0.0.1:1080')
+})
 
-  clearNetwork()
-  // Emptied rather than removed: bare-process exposes env through a proxy with no delete
-  // trap, and an empty value is what the convention means by unset anyway.
-  process.env.https_proxy = ''
-  process.env.HTTPS_PROXY = ''
-  process.env.ALL_PROXY = 'socks5://127.0.0.1:1080'
+test('ALL_PROXY covers a scheme with no proxy of its own', (t) => {
+  t.teardown(withEnv({ ALL_PROXY: 'socks5://127.0.0.1:1080' }))
+  t.teardown(clearNetwork)
   configureNetwork({})
-  t.is(networkPolicy().source, 'ALL_PROXY', 'covers a scheme with no proxy of its own')
+  t.is(networkPolicy().source, 'ALL_PROXY')
   t.ok(agentFor('https://mint.example'))
   t.ok(agentFor('http://mint.example'))
 })
@@ -255,29 +273,37 @@ test('coco reaches a mint through the proxy, not around it', async (t) => {
 
 // Set the environment for one test and put it back, whatever it held before — these tests
 // run in the process that inherited the developer's own shell.
+// Every name a proxy could be read from, in both spellings, so nothing leaks in from the
+// shell that started the run.
+const PROXY_VARS = [
+  'http_proxy',
+  'HTTP_PROXY',
+  'https_proxy',
+  'HTTPS_PROXY',
+  'all_proxy',
+  'ALL_PROXY',
+  'no_proxy',
+  'NO_PROXY',
+  'CASHME_PROXY'
+]
+
 function withEnv(values) {
   const before = new Map()
-  for (const [name, value] of Object.entries(values)) {
-    before.set(name, process.env[name])
-    process.env[name] = value
-  }
-  // Nothing else may leak in from the shell that started the run.
-  const others = [
-    'http_proxy',
-    'HTTP_PROXY',
-    'https_proxy',
-    'HTTPS_PROXY',
-    'all_proxy',
-    'ALL_PROXY',
-    'no_proxy',
-    'NO_PROXY',
-    'CASHME_PROXY'
-  ]
-  for (const name of others) {
-    if (before.has(name)) continue
+
+  // Cleared first and set second, rather than the other way about. On Windows the
+  // environment is case-insensitive, so `all_proxy` and `ALL_PROXY` are one variable —
+  // clearing after setting would wipe the value the test just asked for, and did.
+  for (const name of PROXY_VARS) {
     before.set(name, process.env[name])
     process.env[name] = ''
   }
+  for (const [name, value] of Object.entries(values)) {
+    if (!before.has(name)) before.set(name, process.env[name])
+    process.env[name] = value
+  }
+
+  // On Windows a name and its other spelling restore the same variable twice, to the value
+  // they both read at the start. Harmless, and it keeps this list one shape everywhere.
   return () => {
     for (const [name, value] of before) process.env[name] = value ?? ''
   }
