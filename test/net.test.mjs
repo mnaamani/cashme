@@ -19,11 +19,11 @@ import {
   configureNetwork,
   clearNetwork,
   agentFor,
-  assertUnbound,
   dhtOptions,
   networkPolicy,
   proxyFailure,
   proxyInForce,
+  interfaceInForce,
   updaterBlocked
 } from '../lib/net.mjs'
 
@@ -214,13 +214,16 @@ test('no_proxy of * sends everything direct', (t) => {
   t.is(agentFor('https://mint.example'), null)
 })
 
-test('--interface binds the hyperdht and refuses everything it cannot bind', (t) => {
+test('--dht-interface binds the hyperdht and leaves everything else alone', (t) => {
   t.teardown(clearNetwork)
   configureNetwork({ iface: '127.0.0.1' })
 
-  t.alike(dhtOptions(), { host: '127.0.0.1' })
-  t.exception.all(() => assertUnbound('https requests'), /no way to bind an outgoing/)
-  t.is(updaterBlocked(), '--interface 127.0.0.1')
+  t.alike(dhtOptions(), { host: '127.0.0.1' }, 'the one thing the flag does')
+  t.is(interfaceInForce(), '127.0.0.1', 'as it was spelled, for saying what it reached')
+  // It pins a socket the hyperdht opens. It is not a policy on anything else, so a request
+  // that cannot be bound is made rather than refused — see the note bin.mjs prints instead.
+  t.is(agentFor('https://mint.example'), null, 'and nothing about how a mint is reached')
+  t.is(updaterBlocked(), '--dht-interface 127.0.0.1', 'but the updater would break its one promise')
 })
 
 test('an interface this host does not have is a mistake in the command line', (t) => {
@@ -234,7 +237,7 @@ test('nothing is proxied or bound unless it was asked for', (t) => {
   t.is(updaterBlocked(), null)
   t.alike(dhtOptions(), {})
   t.is(proxyInForce(), null)
-  t.execution(() => assertUnbound('https requests'))
+  t.is(interfaceInForce(), null)
 })
 
 // The load-bearing assumption of the whole feature: coco reaches a mint through global

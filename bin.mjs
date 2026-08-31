@@ -26,9 +26,9 @@ import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
 import {
   configureNetwork,
   updaterBlocked,
-  assertUnbound,
   proxyFailure,
-  proxyInForce
+  proxyInForce,
+  interfaceInForce
 } from './lib/net.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
@@ -78,25 +78,37 @@ if (root.flags.version) {
 // proxy url or an interface this host does not have is a mistake in the command line, so it
 // stops the run here rather than halfway through a payment.
 try {
-  configureNetwork({ proxy: root.flags.proxy, iface: root.flags.interface })
-  // --interface can only be honoured on the hyperdht (see lib/net.mjs), and the command that
-  // was asked for already says whether that is where it is going. Said here, before the
-  // command runs, rather than as a mint request failing halfway through for a reason of
-  // ours — the guards further in are what catch a socket opened somewhere this does not
-  // know about.
+  configureNetwork({ proxy: root.flags.proxy, iface: root.flags.dhtInterface })
   const named = root.current
   const handover = named?.name === get.name || named?.name === give.name
   const overDht = handover && named.flags.dht
-  if (named && !overDht) assertUnbound(`\`${appName} ${named.name}\``)
+
+  // Both flags cover part of a run rather than all of it, and neither refuses a command for
+  // the part it cannot reach. What they do instead is say so, here, once, before anything
+  // goes out — so nobody has to guess which half went where.
 
   // A proxy carries what a proxy can carry. Neither the hyperdht nor the local network
-  // handover is http, so neither goes through it — and that is the command working as
-  // asked, not a flag being ignored: the mint swap behind the handover is proxied all the
-  // same. Said once, here, so nobody has to guess which half went where.
+  // handover is http, so neither goes through it, and that is the command working as asked:
+  // the mint swap behind the handover is proxied all the same.
   const via = proxyInForce()
   if (via && (overDht || (handover && named.flags.lan))) {
     const wire = overDht ? 'the hyperdht' : 'the local network'
     note(`${via.source} carries the mint and relay traffic; the handover over ${wire} is direct`)
+  }
+
+  // --dht-interface reaches the hyperdht and nothing else, so on a command that never opens
+  // it the flag is inert, and on one that does it still leaves the mint traffic to the
+  // routing table. Both are worth a line: a flag reached for and silently doing nothing is
+  // the same surprise as one silently doing too little.
+  const pinned = interfaceInForce()
+  if (named && pinned) {
+    note(
+      overDht
+        ? `--dht-interface ${pinned} pins the handover; the mint traffic behind it goes out ` +
+            'by the routing table'
+        : `--dht-interface ${pinned} does nothing here: \`${appName} ${named.name}\` never ` +
+            'opens the hyperdht'
+    )
   }
 } catch (err) {
   note('[app:error]', err.message)

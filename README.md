@@ -558,7 +558,7 @@ cashme --storage ./wallet balance     # use a specific storage directory
 cashme --no-updates balance           # skip the OTA updater for this run
 cashme --update-window 60000 balance  # how long the updater waits, in ms
 cashme --proxy socks5://127.0.0.1:9050 deposit -a 100   # go out through a proxy
-cashme --interface en0 get --dht      # pin the hyperdht to one local address
+cashme --dht-interface en0 get --dht  # pin the hyperdht to one local address
 ```
 
 ### Where the traffic goes
@@ -609,13 +609,19 @@ do here. TLS is still end to end: the proxy carries the ciphertext and reads no 
 than any other hop. `socks5://`, `socks5h://`, `http://` and `https://` proxies are
 supported, with a username and password in the url when the proxy wants one.
 
-`--interface` pins outgoing packets to one local address, named either by interface or by
-the address itself:
+`--dht-interface` sends the hyperdht out from one local address, named either by interface
+or by the address itself:
 
 ```sh
-cashme --interface en0 get --dht
-cashme --interface 10.8.0.2 give --dht -k <key> -a 21
+cashme --dht-interface en0 get --dht
+cashme --dht-interface 10.8.0.2 give --dht -k <key> -a 21
 ```
+
+It is named for what it reaches. Binding a socket to a local address is something the
+hyperdht's sockets can do and an outgoing TCP connection in Bare cannot, so mint and relay
+traffic is not pinned by it and never was — `--proxy` is the flag for changing what a mint
+sees. It is not `--udp-interface` either: `--lan` discovery is UDP as well and is not pinned,
+for the reason in the header of `lib/lan.mjs`.
 
 The two flags cover different shapes of thing, and each is honest about its edge:
 
@@ -626,14 +632,15 @@ The two flags cover different shapes of thing, and each is honest about its edge
   the hyperdht directly, which is what was asked for. The run prints a line saying which
   half went where. To keep the handover off the internet as well, use bluetooth, `--lan` or
   `give --print`.
-- **`--interface` holds for the hyperdht only.** Bare's TCP stack has no way to bind an
-  outgoing connection to a local address, so anything that reaches a mint or a relay cannot
-  be pinned to one. Here there _is_ something to pin and no way to pin it, so a command that
-  would have to ignore the flag is refused rather than quietly sent out from whichever
-  address the routing table picked.
-- **The OTA updater is skipped** under `--interface`, and under a proxy you named. It is a
-  separate process that fetches over the hyperdht knowing nothing of either, so rather than
-  let it go out on terms this run did not choose, it is left unstarted and said so.
+- **`--dht-interface` holds for the hyperdht only.** Bare's TCP stack has no way to bind an
+  outgoing connection to a local address, so anything reaching a mint or a relay cannot be
+  pinned to one. A command that never opens the hyperdht is not refused for that — the flag
+  is simply inert, and the run says so rather than leaving you to assume it took.
+- **The OTA updater is skipped** under `--dht-interface`, and under a proxy you named. Of
+  the two it is `--dht-interface` whose promise the updater would really break: it is a
+  separate process that reaches the hyperdht — the very thing the flag pins — knowing
+  nothing about it, so rather than let it go out on terms this run did not choose, it is
+  left unstarted and said so.
 
 Bluetooth and `give --print` touch no network at all, and neither flag changes them.
 
@@ -788,7 +795,7 @@ npm start -- --no-updates
 - `lib/mint-url.mjs` - canonical mint urls, and the validation coco's normalizer leaves out
 - `lib/lock.mjs` - advisory lock, one instance per storage directory
 - `lib/updater.mjs` - OTA updates: spawning the daemon, and being it
-- `lib/net.mjs` - the network policy a run is under: `--proxy`, `--interface`, and what
+- `lib/net.mjs` - the network policy a run is under: `--proxy`, `--dht-interface`, and what
   each of them refuses to half-apply
 - `lib/constants.mjs`, `lib/polyfills.mjs` - defaults, and the browser globals Bare lacks
 - `app.js` - daemon launcher and updater resource
