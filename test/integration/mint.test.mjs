@@ -32,7 +32,7 @@ test('a token round trips through the mint and comes back whole', opts, async (t
     until: /waiting for the receiver/
   })
   const token = /cashuB[A-Za-z0-9_-]+/.exec(give.output)?.[0]
-  t.ok(token, 'a token is printed')
+  t.ok(token, `a token is printed${token ? '' : `. Output:\n${give.output}`}`)
 
   const sent = await cli(dir, ['balance'])
   t.ok(satsIn(sent.output, 'Balance') < 200, 'the sent ecash is out of the balance')
@@ -59,7 +59,10 @@ test('a mint the wallet has never used is refused, not trusted', opts, async (t)
     until: /waiting for the receiver/
   })
   const token = /cashuB[A-Za-z0-9_-]+/.exec(give.output)?.[0]
-  t.ok(token, 'a token to offer a wallet that has never heard of this mint')
+  t.ok(
+    token,
+    `a token to offer a wallet that has never heard of this mint${token ? '' : `. Output:\n${give.output}`}`
+  )
 
   // A fresh wallet, so the mint the token names is a stranger — and a test has no terminal
   // to be asked on, which is the case a listening `get` runs in on a server.

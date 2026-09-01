@@ -1,0 +1,100 @@
+{
+  "_comment": [
+    "Licenses for packages that ship no license text of their own, and for third-party",
+    "code compiled into prebuilt binaries so it never appears in the npm tree.",
+    "",
+    "Every entry needs a note saying where the text or the claim came from. A package that",
+    "publishes no license file is not a package whose terms can be guessed at, so the",
+    "answer has to be traceable to somewhere — its source repository, or its own",
+    "package.json where that is all there is.",
+    "",
+    "scripts/notices.js reads this file. Adding a dependency that lands here without an",
+    "entry fails the build."
+  ],
+
+  "packages": {
+    "@cashu/coco-core": {
+      "license": "MIT",
+      "note": "text from cashubtc/coco; the published package carries neither a license field nor a license file",
+      "text": "MIT License\n\nCopyright (c) 2025 Cashu\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."
+    },
+
+    "corestore": {
+      "license": "MIT",
+      "note": "declared in package.json; holepunchto/corestore publishes no license file",
+      "text": "The MIT License (MIT)\n\nCopyright (c) Holepunch Inc\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."
+    },
+
+    "varint": {
+      "license": "MIT",
+      "note": "declared in package.json; chrisdickinson/varint publishes no license file",
+      "text": "The MIT License (MIT)\n\nCopyright (c) Chris Dickinson <chris@neversaw.us>\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."
+    },
+
+    "nostr-wasm": {
+      "license": "MIT",
+      "note": "declared in package.json; the source repository publishes no license file",
+      "text": "The MIT License (MIT)\n\nCopyright (c) fiatjaf <fiatjaf@gmail.com>\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\nof this software and associated documentation files (the \"Software\"), to deal\nin the Software without restriction, including without limitation the rights\nto use, copy, modify, merge, publish, distribute, sublicense, and/or sell\ncopies of the Software, and to permit persons to whom the Software is\nfurnished to do so, subject to the following conditions:\n\nThe above copyright notice and this permission notice shall be included in all\ncopies or substantial portions of the Software.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\nIMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\nFITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\nAUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER\nLIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,\nOUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE\nSOFTWARE."
+    },
+
+    "noise-curve-ed": {
+      "license": "ISC",
+      "note": "declared in package.json; chm-diederichs/noise-curve-ed publishes no license file",
+      "text": "ISC License\n\nCopyright (c) Christophe Diederichs\n\nPermission to use, copy, modify, and/or distribute this software for any\npurpose with or without fee is hereby granted, provided that the above\ncopyright notice and this permission notice appear in all copies.\n\nTHE SOFTWARE IS PROVIDED \"AS IS\" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH\nREGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY\nAND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,\nINDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM\nLOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR\nOTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR\nPERFORMANCE OF THIS SOFTWARE."
+    },
+
+    "bare-stdio": {
+      "license": "Apache-2.0",
+      "note": "declared in package.json; the package ships no license file",
+      "useCanonical": "Apache-2.0"
+    },
+    "bare-bluetooth": {
+      "license": "Apache-2.0",
+      "note": "declared in package.json; the package ships no license file",
+      "useCanonical": "Apache-2.0"
+    },
+    "bare-bluetooth-android": {
+      "license": "Apache-2.0",
+      "note": "declared in package.json; the package ships no license file",
+      "useCanonical": "Apache-2.0"
+    },
+    "bare-bluetooth-apple": {
+      "license": "Apache-2.0",
+      "note": "declared in package.json; the package ships no license file",
+      "useCanonical": "Apache-2.0"
+    }
+  },
+
+  "embedded": [
+    {
+      "name": "librocksdb (RocksDB)",
+      "license": "Apache-2.0",
+      "via": "rocksdb-native",
+      "source": "https://github.com/holepunchto/librocksdb — a fork of facebook/rocksdb, which is dual licensed Apache-2.0 and GPL-2.0; the fork carries the Apache-2.0 election. Portions derive from LevelDB, BSD-3-Clause, Copyright (c) 2011 The LevelDB Authors."
+    },
+    {
+      "name": "libjstl",
+      "license": "Apache-2.0",
+      "via": "rocksdb-native, udx-native",
+      "source": "https://github.com/holepunchto/libjstl"
+    },
+    {
+      "name": "libudx",
+      "license": "Apache-2.0",
+      "via": "udx-native",
+      "source": "https://github.com/holepunchto/libudx"
+    },
+    {
+      "name": "libsodium",
+      "license": "ISC",
+      "via": "sodium-native",
+      "source": "https://github.com/jedisct1/libsodium — Copyright (c) 2013-2025 Frank Denis"
+    },
+    {
+      "name": "Bare runtime",
+      "license": "Apache-2.0",
+      "via": "bare-build",
+      "source": "https://github.com/holepunchto/bare, compiled into the standalone binary — which in turn embeds libuv (MIT) and V8 (BSD-3-Clause)"
+    }
+  ]
+}

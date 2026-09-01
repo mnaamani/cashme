@@ -1,28 +1,35 @@
 {
   "name": "cashme",
   "version": "0.3.0",
-  "description": "Cashu wallet as a standalone Bare process on Pear, with OTA updater support.",
+  "description": "A cashu wallet in your terminal, send and receive ecash over Bluetooth.",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "bin": "bin.mjs",
   "upgrade": "pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o",
   "scripts": {
     "format": "prettier . --write",
     "test": "brittle-bare test/index.js",
     "test:integration": "brittle-bare test/integration/index.js",
-    "test:all": "npm test && npm run test:integration",
-    "lint": "prettier . --check && lunte",
+    "test:all": "npm test && npm run test:packages && npm run test:integration",
+    "lint": "prettier . --check && lunte && npm run notices:check",
+    "notices": "node scripts/notices.js",
+    "notices:check": "node scripts/notices.js --check",
     "start": "bare bin.mjs --no-updates",
     "make": "node scripts/make.js",
     "stage": "bash scripts/stage.sh",
-    "make:darwin-arm64": "bare-build --name cashme --standalone --host darwin-arm64 --out ./out/darwin-arm64 bin.mjs",
-    "make:darwin-x64": "bare-build --name cashme --standalone --host darwin-x64 --out ./out/darwin-x64 bin.mjs",
-    "make:linux-arm64": "bare-build --name cashme --standalone --host linux-arm64 --out ./out/linux-arm64 bin.mjs",
-    "make:linux-x64": "bare-build --name cashme --standalone --host linux-x64 --out ./out/linux-x64 bin.mjs",
-    "make:win32-arm64": "bare-build --name cashme --standalone --host win32-arm64 --out ./out/win32-arm64 bin.mjs",
-    "make:win32-x64": "bare-build --name cashme --standalone --host win32-x64 --out ./out/win32-x64 bin.mjs"
+    "make:darwin-arm64": "bare-build --name cashme --standalone --host darwin-arm64 --out ./out/darwin-arm64 bin.mjs && node scripts/notices.js --copy-to ./out/darwin-arm64",
+    "make:darwin-x64": "bare-build --name cashme --standalone --host darwin-x64 --out ./out/darwin-x64 bin.mjs && node scripts/notices.js --copy-to ./out/darwin-x64",
+    "make:linux-arm64": "bare-build --name cashme --standalone --host linux-arm64 --out ./out/linux-arm64 bin.mjs && node scripts/notices.js --copy-to ./out/linux-arm64",
+    "make:linux-x64": "bare-build --name cashme --standalone --host linux-x64 --out ./out/linux-x64 bin.mjs && node scripts/notices.js --copy-to ./out/linux-x64",
+    "make:win32-arm64": "bare-build --name cashme --standalone --host win32-arm64 --out ./out/win32-arm64 bin.mjs && node scripts/notices.js --copy-to ./out/win32-arm64",
+    "make:win32-x64": "bare-build --name cashme --standalone --host win32-x64 --out ./out/win32-x64 bin.mjs && node scripts/notices.js --copy-to ./out/win32-x64",
+    "test:packages": "npm test --workspaces"
   },
   "dependencies": {
     "@cashu/coco-core": "^2.0.0",
+    "@hyperswarm/secret-stream": "^6.9.1",
     "@noble/curves": "^2.3.0",
     "@noble/hashes": "^2.3.0",
     "@scure/base": "^2.3.0",
@@ -34,11 +41,15 @@
     "bare-fetch": "^3.2.0",
     "bare-file-logger": "^1.2.1",
     "bare-fs": "^4.7.2",
+    "bare-https-proxy-agent": "^0.1.0",
     "bare-os": "^3.9.0",
     "bare-path": "^3.0.0",
     "bare-process": "^4.5.0",
+    "bare-proxy-agent": "^0.1.0",
+    "bare-socks-proxy-agent": "^0.1.0",
     "bare-storage": "^1.1.0",
     "bare-subprocess": "^5.2.3",
+    "bare-tcp": "^2.5.0",
     "bare-tty": "^5.1.0",
     "bare-url": "^2.5.2",
     "bare-ws": "^3.0.0",
@@ -54,13 +65,16 @@
     "pear-runtime": "^1.1.4",
     "protomux": "^3.11.0",
     "ready-resource": "^1.2.0",
+    "udx-native": "^1.20.6",
     "uqr": "^0.1.3",
     "which-runtime": "^1.4.0"
   },
   "devDependencies": {
     "@cashu/coco-adapter-tests": "^2.0.0",
     "bare-build": "^1.0.1",
+    "bare-http1": "^4.5.7",
     "bare-runtime": "^1.29.5",
+    "bare-tcp": "^2.5.0",
     "brittle": "^3.19.0",
     "lunte": "^1.2.0",
     "prettier": "^3.6.2",
@@ -82,7 +96,8 @@
     "lightning",
     "nostr",
     "zap",
-    "cashu"
+    "cashu",
+    "p2p"
   ],
   "overrides": {
     "nostr-tools": {

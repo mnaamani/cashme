@@ -1,0 +1,48 @@
+{
+  "name": "bare-https-proxy-agent",
+  "version": "0.1.0",
+  "description": "HTTP CONNECT proxy agents for Bare, for bare-fetch and bare-ws",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./package": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "lib",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "brittle-bare test/index.mjs"
+  },
+  "dependencies": {
+    "bare-proxy-agent": "^0.1.0"
+  },
+  "devDependencies": {
+    "bare-fetch": "^3.2.0",
+    "bare-http1": "^4.5.7",
+    "bare-tcp": "^2.5.0",
+    "brittle": "^3.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mnaamani/cashme.git",
+    "directory": "packages/bare-https-proxy-agent"
+  },
+  "author": "Mokhtar Naamani",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/mnaamani/cashme/issues"
+  },
+  "keywords": [
+    "bare",
+    "proxy",
+    "agent",
+    "http",
+    "https",
+    "connect",
+    "tunnel"
+  ]
+}

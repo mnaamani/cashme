@@ -121,16 +121,21 @@ jobs:
       - name: Build
         run: npm run make:${{ matrix.host }}
 
+      # npm run make:<host> already put LICENSE, NOTICE and THIRD-PARTY-NOTICES.md in the
+      # out directory. They go in the archive with the binary because that archive is the
+      # whole of what a person downloads, and the licenses of everything compiled into that
+      # binary ask to travel with it.
       - name: Package (unix)
         if: runner.os != 'Windows'
         run: |
           chmod +x out/${{ matrix.host }}/cashme
-          tar -C out/${{ matrix.host }} -czf cashme-${{ matrix.host }}.tar.gz cashme
+          tar -C out/${{ matrix.host }} -czf cashme-${{ matrix.host }}.tar.gz \
+            cashme LICENSE NOTICE THIRD-PARTY-NOTICES.md
 
       - name: Package (windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path out/${{ matrix.host }}/cashme.exe -DestinationPath cashme-${{ matrix.host }}.zip
+        run: Compress-Archive -Path out/${{ matrix.host }}/* -DestinationPath cashme-${{ matrix.host }}.zip
 
       # Two uploads of the same build: the archive is what a person downloads, the bare
       # binary is what pear-build wants.
@@ -161,6 +166,8 @@ jobs:
         with:
           ref: ${{ needs.setup.outputs.ref }}
 
+      # The committed notices are what this job copies — it has no node_modules to
+      # regenerate from. Lint fails on a stale file, so by here it is the current one.
       - name: Download builds
         uses: actions/download-artifact@v4
         with:
@@ -180,6 +187,10 @@ jobs:
             --win32-arm64-app apps/bin-win32-arm64/cashme.exe \
             --target deployment \
             --package package.json
+          # Seeded at the drive root, where `pear dump` can reach them. Not installed:
+          # pear-install only ever mirrors /by-arch/<host>/app/<bin>, so what a pear user
+          # actually reads is `cashme licenses`, compiled into the binary itself.
+          cp LICENSE NOTICE THIRD-PARTY-NOTICES.md deployment/
           tar -C deployment -czf by-arch.tar.gz .
 
       - name: Upload by-arch
