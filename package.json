@@ -1,7 +1,7 @@
 {
   "name": "cashme",
   "version": "0.3.0",
-  "description": "A cashu wallet in your terminal, send and receive tokens privately over bluetooth.",
+  "description": "A cashu wallet in your terminal, send and receive ecash over Bluetooth.",
   "private": true,
   "workspaces": [
     "packages/*"
@@ -94,7 +94,8 @@
     "lightning",
     "nostr",
     "zap",
-    "cashu"
+    "cashu",
+    "p2p"
   ],
   "overrides": {
     "nostr-tools": {

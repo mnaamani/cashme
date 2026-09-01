@@ -4,25 +4,26 @@
 #   curl -fsSL https://raw.githubusercontent.com/mnaamani/cashme/main/install.sh | sh
 #
 # Downloads the standalone binary for this platform from a GitHub release and puts it in
-# ~/.local/bin. If no release asset fits (or GitHub is unreachable) and node is around, it
-# falls back to bootstrapping from the pear network, which is the same path
-# `npm i -g @cashme/cli` takes.
+# ~/.local/bin, checked against the release's SHA256SUMS. That is the only thing it does: no
+# other source, and nothing it will fall back to. For a peer-to-peer install instead, use
+# `npm i -g @cashme/cli`, which fetches the binary off the pear network and never touches a
+# release.
 #
 # Options, as flags (curl -fsSL ... | sh -s -- --dir /usr/local/bin) or environment:
 #   --dir <path>      CASHME_INSTALL_DIR   where to put the binary  (~/.local/bin)
 #   --version <ver>   CASHME_VERSION       release to install, e.g. 0.1.0  (latest)
-#   --method <m>      CASHME_METHOD        release | pear | auto  (auto)
 #   --no-modify-path  CASHME_NO_MODIFY_PATH=1   don't touch shell rc files
 #   --force           CASHME_FORCE=1       overwrite an existing install without asking
-#   --link <pear://>  CASHME_LINK          pear link for the fallback path
 
 set -eu
 
-REPO="${CASHME_REPO:-mnaamani/cashme}"
-LINK="${CASHME_LINK:-pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o}"
+# Hardcoded on purpose: where the binary comes from is the one thing this script vouches for,
+# and it holds keys to real money. The checksum is no help against an override — SHA256SUMS
+# would come from the same redirected place — so pointing the download elsewhere means editing
+# this script, not setting a variable.
+REPO="mnaamani/cashme"
 INSTALL_DIR="${CASHME_INSTALL_DIR:-}"
 VERSION="${CASHME_VERSION:-latest}"
-METHOD="${CASHME_METHOD:-auto}"
 NO_MODIFY_PATH="${CASHME_NO_MODIFY_PATH:-}"
 FORCE="${CASHME_FORCE:-}"
 
@@ -33,11 +34,6 @@ main() {
 
   [ -n "$INSTALL_DIR" ] || INSTALL_DIR="$HOME/.local/bin"
   BIN="$INSTALL_DIR/cashme"
-
-  case "$METHOD" in
-    auto | release | pear) ;;
-    *) die "unknown --method '$METHOD' (expected: auto, release or pear)" ;;
-  esac
 
   if [ -e "$BIN" ] && [ -z "$FORCE" ]; then
     say "cashme is already installed at $BIN"
@@ -52,17 +48,9 @@ main() {
   trap cleanup EXIT INT TERM
   TMPDIR_CASHME="$(mktemp -d 2>/dev/null || mktemp -d -t cashme)"
 
-  if [ "$METHOD" = pear ]; then
-    install_from_pear
-  elif install_from_release; then
-    :
-  elif [ "$METHOD" = auto ]; then
-    say ""
-    say "No release binary for $HOST. Falling back to the pear network."
-    install_from_pear
-  else
-    die "no release binary for $HOST"
-  fi
+  install_from_release || die "no release binary for $HOST
+Install it from peers instead:
+  npm install -g @cashme/cli"
 }
 
 parse_args() {
@@ -72,10 +60,6 @@ parse_args() {
       --dir=*) INSTALL_DIR="${1#*=}" && shift ;;
       --version) need_value "$@" && VERSION="$2" && shift 2 ;;
       --version=*) VERSION="${1#*=}" && shift ;;
-      --method) need_value "$@" && METHOD="$2" && shift 2 ;;
-      --method=*) METHOD="${1#*=}" && shift ;;
-      --link) need_value "$@" && LINK="$2" && shift 2 ;;
-      --link=*) LINK="${1#*=}" && shift ;;
       --no-modify-path) NO_MODIFY_PATH=1 && shift ;;
       --force | -f) FORCE=1 && shift ;;
       -h | --help) usage && exit 0 ;;
@@ -97,10 +81,8 @@ cashme installer — a cashu wallet in your terminal.
 
   --dir <path>      where to put the binary          (\$CASHME_INSTALL_DIR, ~/.local/bin)
   --version <ver>   release to install, e.g. 0.1.0   (\$CASHME_VERSION, latest)
-  --method <m>      release | pear | auto            (\$CASHME_METHOD, auto)
   --no-modify-path  don't touch shell rc files       (\$CASHME_NO_MODIFY_PATH)
   --force           replace an existing install      (\$CASHME_FORCE)
-  --link <pear://>  pear link for the fallback path  (\$CASHME_LINK)
 EOF
 }
 
@@ -131,9 +113,7 @@ detect_host() {
 
 install_from_release() {
   asset="cashme-$HOST.tar.gz"
-  if [ -n "${CASHME_BASE_URL:-}" ]; then
-    base="$CASHME_BASE_URL"
-  elif [ "$VERSION" = latest ]; then
+  if [ "$VERSION" = latest ]; then
     base="https://github.com/$REPO/releases/latest/download"
   else
     base="https://github.com/$REPO/releases/download/v${VERSION#v}"
@@ -167,8 +147,8 @@ verify_checksum() {
     sum="$(shasum -a 256 "$TMPDIR_CASHME/$asset" | cut -d' ' -f1)"
   else
     die "no sha256sum or shasum on this system, so $asset cannot be verified.
-Install one of them, or bootstrap from peers instead:
-  sh install.sh --method pear"
+Install one of them, or install from peers instead:
+  npm install -g @cashme/cli"
   fi
 
   if ! fetch "$base/SHA256SUMS" "$TMPDIR_CASHME/SHA256SUMS"; then
@@ -186,28 +166,6 @@ Refusing to install. Try again, and report it if it persists:
   https://github.com/$REPO/issues"
 
   say "Checksum ok"
-}
-
-# --- pear network fallback --------------------------------------------------
-
-install_from_pear() {
-  command -v node >/dev/null 2>&1 ||
-    die "this needs node to bootstrap from the pear network, and node was not found.
-Install node (https://nodejs.org), then rerun — or grab a binary from
-  https://github.com/$REPO/releases"
-
-  say "Bootstrapping from peers: $LINK"
-  # pear-install refuses to overwrite, so clear the way when the user asked us to.
-  if [ -n "$FORCE" ]; then rm -f "$BIN"; fi
-  # pear-install lands the binary in ~/.local/bin itself; --to redirects it elsewhere.
-  if [ "$INSTALL_DIR" = "$HOME/.local/bin" ]; then
-    npx --yes pear-install@1 "$LINK" || die "bootstrap failed"
-  else
-    mkdir -p "$INSTALL_DIR"
-    npx --yes pear-install@1 --to "$INSTALL_DIR" "$LINK" || die "bootstrap failed"
-  fi
-  [ -x "$BIN" ] || die "bootstrap reported success but $BIN is not there"
-  finish
 }
 
 # --- placing it -------------------------------------------------------------

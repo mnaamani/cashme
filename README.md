@@ -1,6 +1,6 @@
 # CASHME .... if you can
 
-> A cashu wallet in your terminal, send and receive tokens privately over bluetooth.
+> A cashu wallet in your terminal, send and receive ecash over Bluetooth.
 
 ## EXPERIMENTAL - Use at your own risk !!
 
@@ -46,17 +46,18 @@ skips that for a run. To uninstall, delete the binary — the wallet's storage l
 - **`curl | sh`** ([`install.sh`](install.sh)) needs nothing but curl. It downloads the
   release asset for your platform, checks it against the release's `SHA256SUMS`, and
   installs it. `--dir` puts it somewhere else, `--version` pins a release, `--force`
-  replaces an existing install; `sh install.sh --help` lists the rest. With no release
-  asset for your platform it falls back to the pear network, which needs node.
-- **`npm install -g @cashme/cli`** ([`npm/`](npm)) installs a shim that, on its first run,
-  fetches the binary and then execs it — the same shape as `npm i -g pear`. Nothing but the
-  shim comes from the registry, so the wallet itself is never a package update behind. It
-  tries the pear network first and falls back to the same release download `install.sh`
-  does, `SHA256SUMS` check included, so neither route depends on the other working;
-  `CASHME_METHOD=release` (or `pear`) forces one. That first run is also where it can fail,
-  and since `npm install` has already succeeded by then the retry is `cashme` again rather
-  than a reinstall. Whatever you typed is carried through, so `cashme balance` on a new
-  machine installs the wallet and then reports the balance.
+  replaces an existing install; `sh install.sh --help` lists the rest. The release is the
+  only place it looks: with no asset for your platform it stops and points at the npm route
+  rather than falling back to it.
+- **`npm install -g @cashme/cli`** ([`installer/`](installer)) installs a shim that, on its
+  first run, fetches the binary and then execs it — the same shape as `npm i -g pear`.
+  Nothing but the shim comes from the registry, so the wallet itself is never a package
+  update behind. The fetch is pure peer-to-peer: the binary comes off the pear network from
+  whoever is seeding the link, with no release download to fall back on, so an install that
+  finds no peers fails rather than reaching for a second source. That first run is also
+  where it can fail, and since `npm install` has already succeeded by then the retry is
+  `cashme` again rather than a reinstall. Whatever you typed is carried through, so running
+  `cashme balance` on a new machine installs the wallet and then reports the balance.
 - **`pear install`** is the same bootstrap, done by the pear CLI you may already have.
 
 ### Build from source

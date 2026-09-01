@@ -60,11 +60,25 @@ try {
   await flush()
   Bare.exit(1)
 }
+// Two paths every run depends on and neither of which it otherwise shows: which binary is
+// running — there can be one from a release, one from the pear network and one from a
+// checkout on the same machine — and which storage directory this run's money is in, which
+// --storage and a dev build both move. Printed before anything else can go wrong, so it is
+// there on the runs that end in help, in a version, or in an error.
+const storage = root.flags.storage || (isDev ? null : path.join(persistent(), appName))
+const dir = storage || path.join(os.tmpdir(), 'pear', appName)
+note('[app] binary:', process.execPath)
+note('[app] storage:', dir)
+
 // paparam prints help but does not stop us running the command — without this,
 // `cashme get --help` would print its help and then sit waiting on bluetooth.
-if (root.flags.help || root.current?.flags?.help) Bare.exit()
+if (root.flags.help || root.current?.flags?.help) {
+  await flush()
+  Bare.exit()
+}
 if (root.flags.version) {
   console.log(`${appName} v${pkg.version}`)
+  await flush()
   Bare.exit()
 }
 
@@ -111,8 +125,6 @@ try {
 }
 
 const updates = root.flags.updates
-const storage = root.flags.storage || (isDev ? null : path.join(persistent(), appName))
-const dir = storage || path.join(os.tmpdir(), 'pear', appName)
 let wait
 try {
   wait = updateWindow(root.flags.updateWindow)
@@ -124,11 +136,11 @@ try {
 
 if (root.flags.updater) {
   await runUpdater(dir, wait)
+  await flush()
   Bare.exit()
 }
 
 debug('updates:', updates === false ? 'disabled' : 'enabled')
-debug('storage path:', dir)
 
 // The updater is a detached process that fetches over the hyperdht, and inherits none of
 // this run's flags — so lib/updater.mjs forwards it the one that governs where its traffic
