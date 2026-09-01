@@ -90,7 +90,11 @@ test('ecash crosses the hyperdht to the key the receiver printed', opts, async (
   // The full 64 characters, because the DHT resolves an exact key rather than scanning for
   // a prefix the way bluetooth does.
   const give = await cli(sender, ['give', '--dht', '--public-key', listener.key, '--amount', '21'])
-  t.is(give.code, 0, '`cashme give --dht` finds the peer and hands the token over')
+  t.is(
+    give.code,
+    0,
+    `\`cashme give --dht\` finds the peer and hands the token over${give.code === 0 ? '' : `. Output:\n${give.output}`}`
+  )
   t.ok(/sending under a one-run key/.test(give.output), 'under a key of its own by default')
 
   await listener.waitFor(/New Balance/)
