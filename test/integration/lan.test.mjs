@@ -52,7 +52,11 @@ test('ecash crosses the local network to the key the receiver printed', opts, as
   // type.
   const prefix = listener.key.slice(0, 12)
   const give = await cli(sender, ['give', '--lan', '--public-key', prefix, '--amount', '21'])
-  t.is(give.code, 0, '`cashme give --lan` finds the peer and hands the token over')
+  t.is(
+    give.code,
+    0,
+    `\`cashme give --lan\` finds the peer and hands the token over${give.code === 0 ? '' : `. Output:\n${give.output}`}`
+  )
   t.ok(/looking for .* on the local network/.test(give.output), 'over the LAN and nothing else')
 
   await listener.waitFor(/New Balance/)
