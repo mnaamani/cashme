@@ -42,7 +42,6 @@
     "agent",
     "socks",
     "socks5",
-    "socks5h",
-    "tor"
+    "socks5h"
   ]
 }

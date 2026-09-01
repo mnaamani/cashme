@@ -9,7 +9,7 @@ on it, and the reading and error types a handshake is written against.
 **Start with one of these instead**, unless you are teaching this package a protocol of your
 own:
 
-- [`bare-socks-proxy-agent`](../bare-socks-proxy-agent) — SOCKS5, including Tor
+- [`bare-socks-proxy-agent`](../bare-socks-proxy-agent) — SOCKS5
 - [`bare-https-proxy-agent`](../bare-https-proxy-agent) — HTTP CONNECT
 
 ## Usage
@@ -46,7 +46,7 @@ itself TLS (`secure: true`) is reached over TLS as well.
 
 `{ http, https }` — an agent for `http:` targets and one for `https:` ones. `tunnel` is
 `{ proxy, handshake, timeout }`; `opts` goes to `bare-http1`'s `Agent` (keep-alive is on by
-default, which matters when a tunnel is a Tor circuit). `ProxyHTTPAgent` and
+default). `ProxyHTTPAgent` and
 `ProxyHTTPSAgent` are exported for subclassing.
 
 #### `new ProxySocket({ proxy, handshake, timeout }, { host, port })`

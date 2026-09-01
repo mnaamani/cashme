@@ -3,8 +3,6 @@
 SOCKS5 proxy agents for [Bare](https://github.com/holepunchto/bare) — for `bare-fetch`,
 `bare-ws`, and anything else that takes a `bare-http1` agent.
 
-Written for Tor's SOCKS5 port, and speaks to any other SOCKS5 proxy the same way.
-
 ## Usage
 
 ```js
@@ -43,7 +41,7 @@ checked against the host that was asked for and the proxy carries ciphertext it 
 
 `{ http, https }` — an agent for `http:` targets and one for `https:` ones. `proxy` is a url
 string or the result of `parse()`; `opts` goes to `bare-http1`'s `Agent`. Keep-alive is on by
-default: a reused tunnel is a handshake, and with Tor a circuit, that is not built again.
+default.
 
 #### `new SocksProxyHTTPAgent(proxy[, opts])` · `new SocksProxyHTTPSAgent(proxy[, opts])`
 

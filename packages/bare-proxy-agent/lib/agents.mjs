@@ -7,7 +7,7 @@ import { proxyName } from './url.mjs'
 // one — so a pair of these is the whole of routing a program's traffic through a proxy.
 //
 // Keep-alive is on for the same reason it is on bare's own agents, and matters more here: a
-// reused tunnel is a handshake, and with Tor a circuit, that is not built again.
+// reused tunnel is a handshake, that is not built again.
 export class ProxyHTTPAgent extends http.Agent {
   // What Node's proxy agents carry, so code can ask an agent what it speaks. Filled in by
   // the packages that know: ['socks5', 'socks5h'], ['http', 'https'].

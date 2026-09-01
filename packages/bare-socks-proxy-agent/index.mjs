@@ -1,10 +1,9 @@
 // SOCKS5 (RFC 1928) for Bare, as http agents bare-fetch and bare-ws can be handed.
 //
-// Written for Tor's SOCKS5 port, and speaks to any other the same way. Names are never
-// resolved here: the target goes over the wire as written and the proxy resolves it, so no
-// DNS query for it leaves the machine. That is what socks5h:// means elsewhere, and it is
-// what both schemes do here — `socks5://` and `socks5h://` are the same proxy to this
-// package, and the spelling is kept only so errors quote back what was configured.
+// Names are never resolved here: the target goes over the wire as written and the proxy
+// resolves it, so no DNS query for it leaves the machine. That is what socks5h:// means
+// elsewhere, and it is what both schemes do here — `socks5://` and `socks5h://` are the
+// same proxy to this package, and the spelling is kept only so errors quote back what was configured.
 //
 // The socket, the agents and the error type are bare-proxy-agent's; this is the handshake.
 import {

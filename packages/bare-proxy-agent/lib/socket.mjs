@@ -5,7 +5,7 @@ import { ProxyError } from './errors.mjs'
 import { Reader } from './reader.mjs'
 import { proxyName } from './url.mjs'
 
-// How long the proxy has to answer its own handshake. A tunnel Tor has to build takes
+// How long the proxy has to answer its own handshake. When tunneling it takes
 // seconds; a port that is listening but is not a proxy answers nothing at all, and without
 // this the request would wait there rather than say so.
 const HANDSHAKE_TIMEOUT = 30000

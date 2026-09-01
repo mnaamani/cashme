@@ -33,4 +33,3 @@ npm uninstall -g @cashme/cli
 ```
 
 Wallet storage lives elsewhere and is left alone.
-
