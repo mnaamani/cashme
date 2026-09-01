@@ -8,6 +8,12 @@ npm run make
 ./out/your-platform/cashme --help
 ```
 
+Either way the build leaves `LICENSE`, `NOTICE` and a freshly generated
+`THIRD-PARTY-NOTICES.md` next to the binary — the release archives are the whole of that
+directory, because the licenses compiled into the binary ask to be distributed with it.
+`npm run notices` regenerates the file on its own, and `npm run lint` fails when the
+committed copy has fallen behind the dependency tree.
+
 `npm run make` builds for the host it runs on; `npm run make:<host>` cross-builds for any
 of `darwin-arm64`, `darwin-x64`, `linux-arm64`, `linux-x64`, `win32-arm64`, `win32-x64`.
 

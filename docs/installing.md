@@ -38,7 +38,7 @@ cashme --help
 The wallet keeps itself up to date in the background from its own pear link, so whichever
 way it got there, it does not need reinstalling to move to a newer version. `--no-updates`
 skips that for a run. To uninstall, delete the binary — the wallet's storage lives
-[elsewhere](usage.md#the-wallet-on-disk) and outlives it.
+[elsewhere](usage/wallet-on-disk.md) and outlives it.
 
 ## Which route to use
 

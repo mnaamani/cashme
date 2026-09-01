@@ -7,7 +7,9 @@
   },
   "files": [
     "cashme.js",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "publishConfig": {
     "access": "public"

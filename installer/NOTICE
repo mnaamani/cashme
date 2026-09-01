@@ -12,12 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
---------------------------------------------------------------------------------
-
-This product includes software developed by Holepunch Inc, licensed under the
-Apache License, Version 2.0.
-
-The binaries are built with the whole production dependency tree compiled in.
-The license and attribution notices of everything in that tree — the Apache-2.0
-NOTICE files reproduced under section 4(d), and the MIT and ISC permission
-notices — are in THIRD-PARTY-NOTICES.md, distributed alongside this file.
+This package is the installer only. It ships no dependencies of its own — npm
+resolves those at install time, under their own licenses. The notices for
+everything compiled into a cashme binary are in THIRD-PARTY-NOTICES.md, which
+the binary is distributed with.
