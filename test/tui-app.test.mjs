@@ -296,6 +296,22 @@ test('deposit puts the invoice on screen while the mint is still waiting to be p
   ui.app.unmount()
 })
 
+test('a form opens with its first field explaining itself, not just blinking', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('deposit')
+  t.ok(ui.screen().includes('sats'), 'the focused empty field still says what goes in it')
+
+  await ui.type('100')
+  const typed = ui.screen()
+  t.ok(typed.includes('100'), 'what is typed appears')
+  t.absent(typed.includes('sats'), 'and the hint gives way to it rather than trailing after')
+
+  ui.app.unmount()
+})
+
 test('an invoice that wraps can be dragged out with a mouse, and copied with a key', async (t) => {
   const long = fakeApi().depositLong
   const api = fakeApi({
