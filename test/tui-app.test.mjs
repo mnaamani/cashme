@@ -10,6 +10,7 @@ import { h } from '../lib/tui/element.mjs'
 import { render } from '../lib/tui/runtime.mjs'
 import { App } from '../lib/tui/screens/app.mjs'
 import { FakeStdout, FakeStdin, settled } from '../lib/tui/testing.mjs'
+import { strip } from '../lib/tui/style.mjs'
 
 // A wallet that answers instantly and records what it was asked to do.
 function fakeApi(overrides = {}) {
@@ -25,6 +26,52 @@ function fakeApi(overrides = {}) {
 
   return {
     calls,
+    mints: record('mints', [
+      {
+        mintUrl: 'https://mint.example',
+        units: [
+          {
+            unit: 'sat',
+            spendable: 8000,
+            reserved: 0,
+            proofs: 3,
+            reservedProofs: 0,
+            denominations: [
+              { amount: 4096, count: 1 },
+              { amount: 2048, count: 1 },
+              { amount: 8, count: 2 }
+            ]
+          }
+        ]
+      },
+      {
+        mintUrl: 'https://other.example',
+        units: [
+          {
+            unit: 'sat',
+            spendable: 137,
+            reserved: 21,
+            proofs: 5,
+            reservedProofs: 2,
+            denominations: [
+              { amount: 128, count: 1 },
+              { amount: 1, count: 9 }
+            ]
+          },
+          {
+            unit: 'usd',
+            spendable: 12,
+            reserved: 0,
+            proofs: 2,
+            reservedProofs: 0,
+            denominations: [
+              { amount: 8, count: 1 },
+              { amount: 4, count: 1 }
+            ]
+          }
+        ]
+      }
+    ]),
     snapshot: record('snapshot', {
       held: [{ mintUrl: 'https://mint.example', unit: 'sat', spendable: 8000, reserved: 0 }],
       totals: [{ unit: 'sat', spendable: 8000 }],
@@ -62,6 +109,36 @@ function fakeApi(overrides = {}) {
       lines: ['Paying from https://mint.example', '  invoice     100 sat']
     }),
     settleWithdraw: record('settleWithdraw', { changeAmount: 1, effectiveFee: 1 }),
+    planZap: record('planZap', ({ pubkey, amount }) => ({
+      typed: pubkey,
+      recipient: 'b'.repeat(64),
+      label: pubkey,
+      amount,
+      receipt: true,
+      warnings: [],
+      melt: {
+        payable: true,
+        lines: ['Paying from https://mint.example', `  invoice     ${amount} sat`]
+      }
+    })),
+    settleZap: record('settleZap', { effectiveFee: 1 }),
+    planNutzap: record('planNutzap', ({ pubkey, amount }) => ({
+      typed: pubkey,
+      recipient: 'a'.repeat(64),
+      lockKey: `02${'a'.repeat(64)}`,
+      relays: ['wss://relay.example'],
+      mintUrl: 'https://mint.example',
+      amount,
+      fee: 0,
+      warnings: [],
+      prepared: { id: 'p1' }
+    })),
+    settleNutzap: record('settleNutzap', {
+      accepted: 1,
+      results: [{ ok: true }],
+      event: { id: 'e1' }
+    }),
+    cancelNutzap: record('cancelNutzap'),
     refresh: record('refresh', { state: 'pending' }),
     qr: () => ({ width: 20, lines: ['▀▀▀', '▄▄▄'] }),
     copy: record('copy', 'pbcopy'),
@@ -88,14 +165,24 @@ function fakeApi(overrides = {}) {
 }
 
 // The menu's order, so a test can say which action it wants rather than counting arrows.
-const ACTIONS = ['settings', 'deposit', 'give', 'receive', 'withdraw', 'in flight']
+const ACTIONS = [
+  'settings',
+  'balances',
+  'in flight',
+  'deposit',
+  'give',
+  'receive',
+  'withdraw',
+  'zap',
+  'nutzap'
+]
 
 // Mounts the app and returns the handles a test drives it with. `flush` waits for the
 // renders an action sets off — state set in an effect paints on a later turn, not this one.
-function mount(api, { columns = 80, rows = 30 } = {}) {
+function mount(api, { columns = 80, rows = 30, ephemeral = false } = {}) {
   const stdout = new FakeStdout({ columns, rows })
   const stdin = new FakeStdin()
-  const app = render(h(App, { api, version: 'v0' }), { stdout, stdin })
+  const app = render(h(App, { api, version: 'v0', ephemeral }), { stdout, stdin })
   const flush = async (turns = 4) => {
     for (let i = 0; i < turns; i++) await settled()
   }
@@ -126,8 +213,7 @@ test('the menu shows what the wallet holds and what can be done with it', async 
   const ui = mount(fakeApi())
   await ui.flush()
 
-  t.ok(ui.screen().includes('https://mint.example'), 'the mint is named')
-  t.ok(ui.screen().includes('8000 sat'), 'and what it holds')
+  t.ok(ui.screen().includes('8000 sat'), 'what the wallet is worth')
   for (const action of ACTIONS) {
     t.ok(ui.screen().includes(action), `${action} is on the list`)
   }
@@ -137,6 +223,20 @@ test('the menu shows what the wallet holds and what can be done with it', async 
   await ui.type('q')
   t.ok(await ui.app.waitUntilExit().then(() => true), 'q ends the session')
   t.is(ui.stdin.raw, false, 'and the terminal is handed back')
+})
+
+test('a dev build says so, because the wallet on screen is in a temp directory', async (t) => {
+  const plain = mount(fakeApi())
+  await plain.flush()
+  t.absent(plain.screen().includes('temp storage'), 'a real build wears no badge')
+  plain.app.unmount()
+
+  const dev = mount(fakeApi(), { ephemeral: true })
+  await dev.flush()
+  t.ok(dev.screen().includes('dev · temp storage'), 'a dev build wears one on every screen')
+  await dev.pick('withdraw')
+  t.ok(dev.screen().includes('dev · temp storage'), 'including inside an action')
+  dev.app.unmount()
 })
 
 test('the arrow keys move the selection, and a letter no longer jumps anywhere', async (t) => {
@@ -152,7 +252,7 @@ test('the arrow keys move the selection, and a letter no longer jumps anywhere',
 
   t.ok(chosen().includes('settings'), 'the list starts on the first action')
   await ui.type('\x1b[B')
-  t.ok(chosen().includes('deposit'), 'down moves to the next one')
+  t.ok(chosen().includes('balances'), 'down moves to the next one')
   await ui.type('\x1b[A')
   t.ok(chosen().includes('settings'), 'and up moves back')
 
@@ -853,6 +953,263 @@ test('Q and Ctrl-C leave the same way, and Ctrl-C leaves from anywhere', async (
   }
 })
 
+test('the menu shows the total and nothing about which mint it is at', async (t) => {
+  const ui = mount(fakeApi(), { columns: 96 })
+  await ui.flush()
+
+  t.ok(ui.screen().includes('8000 sat'), 'the total is on the menu')
+  t.absent(ui.screen().includes('mint.example'), 'no mint is named there')
+  t.ok(ui.screen().includes('what each mint holds'), 'and the detail is an action away')
+
+  ui.app.unmount()
+})
+
+test('the balances screen says what each mint holds, and in what', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('balances')
+  const screen = ui.screen()
+
+  t.ok(screen.includes('mints (2)'), 'both mints are counted')
+  t.ok(screen.includes('https://mint.example'), 'and named')
+  t.ok(screen.includes('8000 sat'), 'with what each is worth')
+  t.ok(screen.includes('137 sat'), 'including the smaller one')
+
+  // The part a balance cannot answer: what the money is made of.
+  t.ok(screen.includes('3 proofs'), 'how many proofs the first holds')
+  t.ok(screen.includes('4096  2048  8×2'), 'and in which denominations, biggest first')
+  t.ok(screen.includes('1×9'), 'a repeated denomination is counted rather than repeated')
+
+  // Reserved proofs are a count and an amount, and they are two different numbers.
+  t.ok(screen.includes('sat · 5 proofs'), 'the second mint is counted too')
+  t.ok(screen.includes('2 reserved'), 'with the proofs an operation is holding')
+  t.ok(screen.includes('21 sat'), 'and what they come to')
+
+  // The second mint issues two units, so it holds two of everything: two balances, two
+  // proof counts and two sets of denominations, none of which are summed across.
+  t.ok(screen.includes('137 sat  12 usd'), 'a mint with two units is worth both')
+  t.ok(screen.includes('usd · 2 proofs'), 'its units are counted apart, and named')
+  t.ok(screen.includes('8  4'), 'and each carries its own denominations')
+  t.absent(screen.includes('7 proofs'), 'proofs are never pooled across units')
+
+  // And the mint issuing one unit says so plainly — a label would be noise.
+  t.ok(screen.includes('  3 proofs'), 'a single-unit mint is not labelled')
+
+  await ui.type('\x1b')
+  t.ok(ui.screen().includes('what each mint holds'), 'escape comes back to the menu')
+
+  ui.app.unmount()
+})
+
+test('a wallet with nothing in it says so rather than showing an empty box', async (t) => {
+  const api = fakeApi({ mints: () => Promise.resolve([]) })
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('balances')
+  t.ok(ui.screen().includes('no ecash yet'), 'the screen says there is nothing to show')
+
+  ui.app.unmount()
+})
+
+test('the actions are in three groups, and the gaps are not selectable', async (t) => {
+  const ui = mount(fakeApi(), { columns: 96 })
+  await ui.flush()
+
+  const chosen = () =>
+    ui
+      .screen()
+      .split('\n')
+      .find((line) => line.includes('\u203a'))
+
+  // Nine actions, so nine downs come back to the top — the blank lines between the groups
+  // are not stops on the way.
+  t.ok(chosen().includes('settings'), 'starts on the first')
+  for (let i = 0; i < ACTIONS.length; i++) await ui.type('\x1b[B')
+  t.ok(chosen().includes('settings'), 'and wraps after exactly as many downs as there are actions')
+
+  // The groups themselves: what the wallet is, what it can do, and who it can pay.
+  const lines = ui.screen().split('\n')
+  const rowOf = (label) =>
+    lines.findIndex((line) => line.includes(`${label} `) && line.includes('│'))
+  t.ok(rowOf('in flight') + 1 < rowOf('deposit'), 'a blank line separates the first two groups')
+  t.ok(rowOf('withdraw') + 1 < rowOf('zap'), 'and the second from the third')
+
+  ui.app.unmount()
+})
+
+test('zap quotes before it spends, and says whether there will be a receipt', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('zap')
+  await ui.type('npub1someone')
+  await ui.enter(1)
+  await ui.type('21')
+  await ui.enter(3) // past the comment field, onto the button, then press it
+
+  t.is(api.calls.find(([name]) => name === 'planZap')?.[1].amount, 21, 'the amount is quoted')
+  t.ok(ui.screen().includes('Zap 21 sat to npub1someone?'), 'and confirmation is asked for')
+  t.ok(ui.screen().includes('you typed  npub1someone'), 'showing what was typed')
+  t.ok(ui.screen().includes(`their key  ${'b'.repeat(64)}`), 'and who the lookup found')
+  t.absent(
+    api.calls.some(([name]) => name === 'settleZap'),
+    'nothing is spent while the question stands'
+  )
+
+  await ui.type('y')
+  t.ok(
+    api.calls.some(([name]) => name === 'settleZap'),
+    'Y pays it'
+  )
+  t.ok(ui.screen().includes('receipt'), 'and says the receipt is coming')
+
+  ui.app.unmount()
+})
+
+test('a zap with no receipt says so before it is paid', async (t) => {
+  const api = fakeApi({
+    planZap: ({ amount }) => ({
+      label: 'someone@example.com',
+      amount,
+      receipt: false,
+      warnings: ['no nostr key there — this pays the lightning address, with no zap receipt'],
+      melt: { payable: true, lines: ['Paying from https://mint.example'] }
+    })
+  })
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('zap')
+  await ui.type('someone@example.com')
+  await ui.enter(1)
+  await ui.type('21')
+  await ui.enter(3)
+
+  t.ok(ui.screen().includes('no zap receipt'), 'the thing that makes it a zap is missing, and said')
+
+  ui.app.unmount()
+})
+
+test('a nutzap reserves proofs, and refusing hands them back', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('nutzap')
+  await ui.type('npub1someone')
+  await ui.enter(1)
+  await ui.type('21')
+  await ui.enter(4) // past mint and comment, onto the button, then press it
+
+  t.ok(
+    api.calls.some(([name]) => name === 'planNutzap'),
+    'they are looked up first'
+  )
+
+  // The lookup is the half that could have gone somewhere unexpected, so the confirmation
+  // shows what it decided before it asks — who they turned out to be, and which key the
+  // ecash gets locked to, neither of which was typed.
+  const asked = ui.screen()
+  t.ok(asked.includes('you typed  npub1someone'), 'what was typed is repeated back')
+  t.ok(asked.includes(`their key  ${'a'.repeat(64)}`), 'with the key it resolved to')
+  t.ok(asked.includes(`locked to  02${'a'.repeat(64)}`), 'and the key the ecash is locked to')
+  t.ok(asked.includes('cannot be reclaimed'), 'and the one-way door is named before it opens')
+  t.absent(
+    api.calls.some(([name]) => name === 'settleNutzap'),
+    'nothing is published while the question stands'
+  )
+
+  await ui.type('n')
+  t.ok(
+    api.calls.some(([name]) => name === 'cancelNutzap'),
+    'refusing gives the reserved proofs back rather than just closing the question'
+  )
+  t.absent(
+    api.calls.some(([name]) => name === 'settleNutzap'),
+    'and publishes nothing'
+  )
+
+  ui.app.unmount()
+})
+
+test('a nutzap no relay accepted is not reported as a send that can be retried', async (t) => {
+  const api = fakeApi({
+    settleNutzap: () => ({ accepted: 0, results: [{ ok: false }], event: { id: 'e1' } })
+  })
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('nutzap')
+  await ui.type('npub1someone')
+  await ui.enter(1)
+  await ui.type('21')
+  await ui.enter(4)
+  await ui.type('y')
+
+  t.ok(ui.screen().includes('no relay accepted'), 'the screen says nothing carried it')
+  t.ok(ui.screen().includes('cannot be reclaimed'), 'and that the ecash is gone all the same')
+
+  ui.app.unmount()
+})
+
+test('escape leaves the menu on the action it just came out of', async (t) => {
+  const ui = mount(fakeApi(), { columns: 96 })
+  await ui.flush()
+
+  const chosen = () =>
+    ui
+      .screen()
+      .split('\n')
+      .find((line) => line.includes('\u203a'))
+
+  // Not just the first one: an action from each group, since the gaps between them are
+  // where an index and a row number stop agreeing.
+  for (const action of ['balances', 'withdraw', 'nutzap']) {
+    await ui.pick(action)
+    await ui.type('\x1b')
+    t.ok(chosen().includes(action), `coming back from ${action} leaves the marker on it`)
+  }
+
+  // And it is a starting point, not a lock — the arrows still move from there.
+  await ui.type('\x1b[A')
+  t.absent(
+    chosen().includes('nutzap'),
+    'the remembered row is where the keyboard starts, not where it stays'
+  )
+
+  ui.app.unmount()
+})
+
+test('a confirmation and its answer keys fit on a short terminal', async (t) => {
+  // The question is the whole point of these two screens, and it is the last thing drawn —
+  // so it is the first thing a terminal too short for everything cuts off.
+  for (const [action, keys] of [
+    ['withdraw', ['lnbc1test', '\r', '\r', '\r']],
+    ['zap', ['npub1someone', '\r', '21', '\r', '\r', '\r']],
+    ['nutzap', ['npub1someone', '\r', '21', '\r', '\r', '\r', '\r']]
+  ]) {
+    for (const rows of [24, 30, 40]) {
+      const ui = mount(fakeApi(), { columns: 96, rows })
+      await ui.flush()
+      await ui.pick(action)
+      for (const key of keys) await ui.type(key)
+
+      const screen = ui.screen()
+      t.ok(
+        screen.includes('Y to accept'),
+        `${action} at ${rows} rows: the way to say yes is on screen`
+      )
+      t.ok(screen.includes('N to refuse'), `${action} at ${rows} rows: and the way to say no`)
+
+      ui.app.unmount()
+    }
+  }
+})
+
 test('what the wallet says about itself lands in the log, not over the layout', async (t) => {
   const { note } = await import('../lib/notes.mjs')
   const ui = mount(fakeApi())
@@ -884,7 +1241,43 @@ test('the layout survives a terminal being resized under it', async (t) => {
     lines.every((line) => line.length <= 48),
     'nothing is wider than the terminal now is'
   )
-  t.ok(ui.screen().includes('mint.example'), 'and the wallet is still on screen')
+  t.ok(ui.screen().includes('8000 sat'), 'and the wallet is still on screen')
 
   ui.app.unmount()
+})
+
+test('the frame stops one cell short of the terminal in both directions', async (t) => {
+  // The last row scrolls some terminals on the alternate screen, and the last column is
+  // both where a pending wrap lives and where an overlay scrollbar sits — which for this
+  // UI would hide every box's right border and the last digit of the balance.
+  for (const [columns, rows] of [
+    [105, 29],
+    [80, 24],
+    [60, 20]
+  ]) {
+    const ui = mount(fakeApi(), { columns, rows })
+    await ui.flush()
+
+    const painted = ui.stdout.writes.filter((chunk) => chunk.startsWith('\x1b[H')).pop()
+    const lines = painted
+      .replace(/\x1b\[H/, '')
+      .replace(/\x1b\[J$/, '')
+      .split('\r\n')
+      .map((line) => strip(line.replace(/\x1b\[K$/, '')))
+
+    t.ok(lines.length <= rows - 1, `${columns}x${rows}: no more rows than the frame allows`)
+    t.ok(
+      lines.every((line) => line.length <= columns - 1),
+      `${columns}x${rows}: no line reaches the last column`
+    )
+    // And the border really is the last thing on a box line, not cut off it.
+    const top = lines.find((line) => line.startsWith('╭'))
+    t.ok(top.endsWith('╮'), `${columns}x${rows}: the top border closes`)
+    t.ok(
+      lines.filter((line) => line.startsWith('│')).every((line) => line.endsWith('│')),
+      `${columns}x${rows}: and every side of it is there`
+    )
+
+    ui.app.unmount()
+  }
 })
