@@ -31,11 +31,13 @@ const output = path.join(root, 'THIRD-PARTY-NOTICES.md')
 const bundle = path.join(root, 'lib', 'third-party-notices.mjs')
 const overrides = require('./notices-overrides.json')
 
-// npm on Windows is a shim script rather than an executable, so a bare 'npm' is not
-// something CreateProcess can find and spawning it is ENOENT. scripts/make.js goes through
-// a shell for the same reason; here the .cmd is enough, since the arguments are ours and
-// never need quoting.
-const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+// npm on Windows is npm.cmd, a batch script rather than an executable: a bare 'npm' is not
+// something CreateProcess can find, and since the CVE-2024-27980 fix node refuses to spawn
+// a .cmd at all without a shell to run it. So Windows needs both the extension and the
+// shell, which is what scripts/make.js does too. Going through a shell is safe here because
+// every argument is a literal of ours — nothing user-supplied reaches the command line.
+const WINDOWS = process.platform === 'win32'
+const NPM = WINDOWS ? 'npm.cmd' : 'npm'
 
 const LICENSE_FILE = /^(licen[cs]e|copying)(\.|$)/i
 const NOTICE_FILE = /^notice(\.|$)/i
@@ -91,6 +93,7 @@ function argValue(flag) {
 // texts themselves have to be read from.
 function collect() {
   const json = execFileSync(NPM, ['ls', '--omit=dev', '--all', '--json', '--long'], {
+    shell: WINDOWS,
     cwd: root,
     maxBuffer: 1024 * 1024 * 256,
     encoding: 'utf8'
