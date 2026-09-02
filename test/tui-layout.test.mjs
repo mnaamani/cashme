@@ -1,7 +1,7 @@
 // The layout, which is where a terminal UI actually goes wrong: a box drawn a column too
 // wide wraps and every line under it is off by one for the rest of the session.
 import test from 'brittle'
-import { keyName, Hints } from '../lib/tui/components.mjs'
+import { keyName, Hints, completes } from '../lib/tui/components.mjs'
 import { h, text, box, row, column, spacer } from '../lib/tui/element.mjs'
 import { render } from '../lib/tui/layout.mjs'
 import { width, cut, pad, wrap, style, strip } from '../lib/tui/style.mjs'
@@ -132,4 +132,31 @@ test('a key shown in capitals works whether or not shift is held', (t) => {
   press('c')
   press('C')
   t.alike(seen, ['c', 'C'], 'both reach the same binding')
+})
+
+test('completion finds a mint by any part of its url, not just the front', (t) => {
+  const mints = ['https://mint.example', 'https://testnut.cashu.space']
+
+  // The whole match comes back, since a match in the middle has no tail to append.
+  t.is(completes('https://m', mints), 'https://mint.example', 'a prefix matches')
+  t.is(completes('HTTPS://M', mints), 'https://mint.example', 'case does not matter for a url')
+
+  // The point of the exercise: the memorable part of a mint url is never its first
+  // characters, which are `https://` on every one of them.
+  t.is(completes('cashu', mints), 'https://testnut.cashu.space', 'so does the middle')
+  t.is(completes('.space', mints), 'https://testnut.cashu.space', 'and the end')
+  t.is(completes('NUT', mints), 'https://testnut.cashu.space', 'in any case')
+
+  // A prefix wins over a match in the middle, since typing the front of a url means that
+  // one — and it is the match that can be finished in place rather than swapped out.
+  t.is(
+    completes('https://t', ['https://mint.example/https://t', 'https://testnut.cashu.space']),
+    'https://testnut.cashu.space',
+    'a prefix is preferred to a match in the middle'
+  )
+
+  t.is(completes('', mints), '', 'an empty field is offered nothing')
+  t.is(completes('https://mint.example', mints), '', 'a finished field stops suggesting itself')
+  t.is(completes('nope', mints), '', 'and nothing matches what no mint contains')
+  t.is(completes('https://m', []), '', 'a wallet trusting nothing offers nothing')
 })

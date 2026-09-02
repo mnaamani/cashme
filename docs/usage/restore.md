@@ -4,11 +4,12 @@ Rebuild proofs a mint issued but this wallet never recorded — a wallet that fe
 mint, through a crash mid-write or a file copied back from an older backup:
 
 ```sh
-cashme restore
 cashme restore --mint https://mint.example.com
 ```
 
-Short flag: `-m`.
+Short flag: `-m`. It is required — a seed does not record which mints it was used at, so
+there is nothing for a default to be right about. Run it without one and the error lists
+the mints this wallet already trusts.
 
 A repair, not a backup. It replays the deterministic secrets (NUT-13) derived from the seed
 inside this wallet's own file, so it recovers nothing if that file is gone. One mint at a

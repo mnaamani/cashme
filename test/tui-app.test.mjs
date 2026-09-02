@@ -30,6 +30,7 @@ function fakeApi(overrides = {}) {
     mints: record('mints', [
       {
         mintUrl: 'https://mint.example',
+        trusted: true,
         units: [
           {
             unit: 'sat',
@@ -47,6 +48,7 @@ function fakeApi(overrides = {}) {
       },
       {
         mintUrl: 'https://other.example',
+        trusted: true,
         units: [
           {
             unit: 'sat',
@@ -76,7 +78,10 @@ function fakeApi(overrides = {}) {
     snapshot: record('snapshot', {
       held: [{ mintUrl: 'https://mint.example', unit: 'sat', spendable: 8000, reserved: 0 }],
       totals: [{ unit: 'sat', spendable: 8000 }],
-      pending: []
+      pending: [],
+      // What the mint fields complete from, in the order the real snapshot puts them:
+      // the one holding something first.
+      mints: ['https://mint.example', 'https://other.example']
     }),
     deposit: record('deposit', ({ onQuote }) => {
       onQuote({ request: 'lnbc1invoice' })
@@ -96,6 +101,8 @@ function fakeApi(overrides = {}) {
     inspect: (token) => ({ amount: 21, unit: 'sat', mintUrl: 'https://stranger.example', token }),
     trusted: record('trusted', false),
     trust: record('trust'),
+    trustMint: record('trustMint'),
+    untrustMint: record('untrustMint'),
     claim: record('claim'),
     listen: (opts) => {
       calls.push(['listen', opts])
@@ -168,7 +175,7 @@ function fakeApi(overrides = {}) {
 // The menu's order, so a test can say which action it wants rather than counting arrows.
 const ACTIONS = [
   'settings',
-  'balances',
+  'mints',
   'in flight',
   'deposit',
   'give',
@@ -253,7 +260,7 @@ test('the arrow keys move the selection, and a letter no longer jumps anywhere',
 
   t.ok(chosen().includes('settings'), 'the list starts on the first action')
   await ui.type('\x1b[B')
-  t.ok(chosen().includes('balances'), 'down moves to the next one')
+  t.ok(chosen().includes('mints'), 'down moves to the next one')
   await ui.type('\x1b[A')
   t.ok(chosen().includes('settings'), 'and up moves back')
 
@@ -287,12 +294,172 @@ test('deposit puts the invoice on screen while the mint is still waiting to be p
   t.ok(ui.screen().includes('deposit'), 'picking it opens the deposit screen')
 
   await ui.type('100')
-  await ui.enter(4) // through mint and unit, onto the button, then press it
+  await ui.enter() // onto the mint, which is not filled in for you
+  await ui.type('https://mint.example')
+  await ui.enter(3) // through unit, onto the button, then press it
 
   t.ok(ui.screen().includes('lnbc1invoice'), 'the invoice appears')
   t.ok(ui.screen().includes('pay this invoice'), 'in the pane that says to pay it')
   const call = api.calls.find(([name]) => name === 'deposit')
   t.is(call[1].amount, 100, 'and the amount typed is the amount asked for')
+
+  ui.app.unmount()
+})
+
+test('deposit does not fill the mint in for you, and will not act until it is', async (t) => {
+  // Which mint to deposit at is the decision to trust it. A form that arrives with one
+  // already typed in is one people press enter through, and the one it used to arrive with
+  // was a testing mint whose ecash is worthless.
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('deposit')
+  t.ok(ui.screen().includes('the mint to deposit at'), 'the field is empty and says what goes in')
+  t.absent(ui.screen().includes('testnut'), "nothing is chosen on the user's behalf")
+
+  await ui.type('100')
+  await ui.enter(3) // past the empty mint and the unit, onto the button
+  t.ok(ui.screen().includes('a mint is needed'), 'and it says which half is missing')
+
+  await ui.type('\r')
+  t.absent(
+    api.calls.some(([name]) => name === 'deposit'),
+    'the button will not act without one'
+  )
+
+  ui.app.unmount()
+})
+
+test('a mint field completes from the mints this wallet trusts', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('deposit')
+  await ui.type('100')
+  await ui.enter() // onto the mint
+
+  // Nothing is offered before anything is typed: which mint to deposit at stays a choice
+  // the user makes, and the empty field goes on saying what belongs in it.
+  t.ok(ui.screen().includes('the mint to deposit at'), 'an empty field offers nothing')
+
+  await ui.type('https://m')
+  t.ok(ui.screen().includes('https://mint.example'), 'a prefix brings up the rest of the match')
+  t.ok(ui.screen().includes('Tab to take the mint offered'), 'and the key that takes it is named')
+
+  await ui.type('\t')
+  await ui.enter(2) // through the unit, onto the button
+  await ui.type('\r')
+
+  t.is(
+    api.calls.find(([name]) => name === 'deposit')?.[1].mintUrl,
+    'https://mint.example',
+    'accepting it fills the field in whole'
+  )
+
+  ui.app.unmount()
+})
+
+test('every form with a mint field completes it, not just the deposit one', async (t) => {
+  // Four screens ask for a mint and each keeps its form differently — an object here, a
+  // state of its own there, and give's fields change with the method. The wiring is what
+  // this checks: that the accepted url is what reaches the wallet in each of them.
+  for (const [action, keys, call, field] of [
+    ['give', ['\r', '21', '\r'], 'prepareGive', 'mint'],
+    ['withdraw', ['lnbc1test', '\r'], 'planWithdraw', 'mint'],
+    ['nutzap', ['npub1someone', '\r', '21', '\r'], 'planNutzap', 'mint']
+  ]) {
+    const api = fakeApi({ reach: () => new Promise(() => {}) })
+    const ui = mount(api, { columns: 96 })
+    await ui.flush()
+
+    await ui.pick(action)
+    for (const key of keys) await ui.type(key)
+    await ui.type('https://o')
+    t.ok(ui.screen().includes('https://other.example'), `${action}: the rest of the match shows`)
+
+    await ui.type('\t')
+    await ui.enter(4) // out of the fields, onto the button, and press it
+    await ui.flush(6)
+
+    t.is(
+      api.calls.find(([name]) => name === call)?.[1][field],
+      'https://other.example',
+      `${action}: the completed mint is the one the wallet is asked about`
+    )
+
+    ui.app.unmount()
+  }
+})
+
+test('a mint is found by the memorable part of its url, not just the front', async (t) => {
+  // Every mint url starts `https://`, so the front of one is the part nobody remembers.
+  // Typing what they do remember has to find it.
+  const api = fakeApi()
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('deposit')
+  await ui.type('100')
+  await ui.enter()
+  await ui.type('other')
+
+  t.ok(ui.screen().includes('→ https://other.example'), 'the whole url is offered alongside')
+  t.ok(ui.screen().includes('Tab to take the mint offered'), 'and the key that takes it is named')
+
+  await ui.type('\t')
+  await ui.enter(2)
+  await ui.type('\r')
+
+  // A match found in the middle has no tail to append, so taking it replaces what was
+  // typed. Appending would have asked the mint about `otherhttps://other.example`.
+  t.is(
+    api.calls.find(([name]) => name === 'deposit')?.[1].mintUrl,
+    'https://other.example',
+    'taking it replaces what was typed rather than adding to it'
+  )
+
+  ui.app.unmount()
+})
+
+test('a completion is only ever offered, never applied on its own', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('deposit')
+  await ui.type('100')
+  await ui.enter()
+  await ui.type('https://m')
+  // Walking past a field with a suggestion in it must not take the suggestion: enter is
+  // how a form is walked, and it means the same thing here as everywhere else.
+  await ui.enter(2)
+  await ui.type('\r')
+
+  t.is(
+    api.calls.find(([name]) => name === 'deposit')?.[1].mintUrl,
+    'https://m',
+    'what was typed is what is used'
+  )
+
+  ui.app.unmount()
+})
+
+test('what does not match a trusted mint is left alone', async (t) => {
+  const ui = mount(fakeApi())
+  await ui.flush()
+
+  await ui.pick('deposit')
+  await ui.type('100')
+  await ui.enter()
+  await ui.type('https://stranger')
+
+  t.absent(ui.screen().includes('Tab to take'), 'nothing is offered for a mint we do not know')
+  // Tab keeps its ordinary meaning where there is nothing to accept, so a field with no
+  // suggestion in it is walked exactly as it was before.
+  await ui.type('\t')
+  t.ok(ui.screen().includes('unit'), 'and tab moves on as it always did')
 
   ui.app.unmount()
 })
@@ -326,7 +493,9 @@ test('an invoice that wraps can be dragged out with a mouse, and copied with a k
 
   await ui.pick('deposit')
   await ui.type('100')
-  await ui.enter(4)
+  await ui.enter()
+  await ui.type('https://mint.example')
+  await ui.enter(3)
 
   const lines = ui.screen().split('\n')
   const first = lines.findIndex((line) => line.includes('lnbc1'))
@@ -955,6 +1124,9 @@ test('enter in a field moves on; only the button acts', async (t) => {
 
   await ui.pick('deposit')
   await ui.type('100')
+  await ui.type('\t')
+  await ui.type('https://mint.example')
+  await ui.type('\x1b[A') // back to the amount, so the walk below starts where it did
 
   // Three fields and a button. Enter walks them without asking anything of the mint.
   for (let i = 0; i < 3; i++) {
@@ -1176,17 +1348,17 @@ test('the menu shows the total and nothing about which mint it is at', async (t)
 
   t.ok(ui.screen().includes('8000 sat'), 'the total is on the menu')
   t.absent(ui.screen().includes('mint.example'), 'no mint is named there')
-  t.ok(ui.screen().includes('what each mint holds'), 'and the detail is an action away')
+  t.ok(ui.screen().includes('what each holds'), 'and the detail is an action away')
 
   ui.app.unmount()
 })
 
-test('the balances screen says what each mint holds, and in what', async (t) => {
+test('the mints screen says what each mint holds, and in what', async (t) => {
   const api = fakeApi()
   const ui = mount(api, { columns: 96 })
   await ui.flush()
 
-  await ui.pick('balances')
+  await ui.pick('mints')
   const screen = ui.screen()
 
   t.ok(screen.includes('mints (2)'), 'both mints are counted')
@@ -1215,7 +1387,192 @@ test('the balances screen says what each mint holds, and in what', async (t) => 
   t.ok(screen.includes('  3 proofs'), 'a single-unit mint is not labelled')
 
   await ui.type('\x1b')
-  t.ok(ui.screen().includes('what each mint holds'), 'escape comes back to the menu')
+  t.ok(ui.screen().includes('what each holds'), 'escape comes back to the menu')
+
+  ui.app.unmount()
+})
+
+// A wallet with one of each, which is what the trust rows are about.
+function mintList() {
+  return [
+    {
+      mintUrl: 'https://mint.example',
+      trusted: true,
+      units: [
+        {
+          unit: 'sat',
+          spendable: 8000,
+          reserved: 0,
+          proofs: 3,
+          reservedProofs: 0,
+          denominations: [{ amount: 4096, count: 1 }]
+        }
+      ]
+    },
+    { mintUrl: 'https://quarantined.example', trusted: false, units: [] }
+  ]
+}
+
+test('the mints screen says which mints are trusted, and what untrusted costs', async (t) => {
+  const ui = mount(fakeApi({ mints: () => Promise.resolve(mintList()) }), { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('mints')
+  const screen = ui.screen()
+  t.ok(screen.includes('trusted'), 'a trusted mint says so')
+  t.ok(
+    screen.includes('nothing here can be spent until it is trusted again'),
+    'and an untrusted one says what that means rather than just naming itself'
+  )
+  // A mint holding nothing is still on the list: untrusted, or trusted by name and never
+  // used, it is still something to see and act on.
+  t.ok(screen.includes('quarantined.example'), 'a mint with no ecash at it is still listed')
+
+  ui.app.unmount()
+})
+
+test('A adds a mint by url, and the list picks it up', async (t) => {
+  const api = fakeApi({ mints: () => Promise.resolve(mintList()) })
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('mints')
+  await ui.type('a')
+  t.ok(ui.screen().includes('Enter trusts it'), 'A opens a field to type one into')
+  t.ok(ui.screen().includes('mint.example'), 'and the list stays visible behind it')
+
+  await ui.type('https://new.example')
+  await ui.type('\r')
+  await ui.flush(6)
+
+  t.is(
+    api.calls.find(([name]) => name === 'trustMint')?.[1],
+    'https://new.example',
+    'enter trusts what was typed'
+  )
+  t.absent(ui.screen().includes('Enter trusts it'), 'and the field closes once it worked')
+
+  ui.app.unmount()
+})
+
+test('the add field owns the keyboard, since a url is full of letters that do things', async (t) => {
+  const api = fakeApi({ mints: () => Promise.resolve(mintList()) })
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('mints')
+  await ui.type('a')
+  // r reads the list again and t toggles trust — both are in `https://retest.example`, and
+  // a field that let them through would be impossible to type a url into.
+  await ui.type('https://retest.example')
+
+  t.ok(ui.screen().includes('https://retest.example'), 'every character reaches the field')
+  t.absent(
+    api.calls.some(([name]) => name === 'untrustMint' || name === 'trustMint'),
+    'and none of them acted on the mint under the cursor'
+  )
+
+  await ui.type('\x1b')
+  t.absent(ui.screen().includes('Enter trusts it'), 'escape closes it')
+  t.absent(
+    api.calls.some(([name]) => name === 'trustMint'),
+    'and nothing was trusted on the way out'
+  )
+
+  ui.app.unmount()
+})
+
+test('a url that is not a mint keeps the field open to be corrected', async (t) => {
+  // Trusting reaches the mint, so this is where a typo is found out. Clearing the field on
+  // failure would mean typing the whole url again to fix one character of it.
+  const api = fakeApi({
+    mints: () => Promise.resolve(mintList()),
+    trustMint: () => Promise.reject(new Error('could not reach it'))
+  })
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('mints')
+  await ui.type('a')
+  await ui.type('https://typo.example')
+  await ui.type('\r')
+  await ui.flush(6)
+
+  t.ok(ui.screen().includes('could not reach it'), 'the failure is on screen')
+  t.ok(ui.screen().includes('https://typo.example'), 'and what was typed is still there')
+
+  ui.app.unmount()
+})
+
+test('T trusts a mint back without asking, since nothing is taken away by it', async (t) => {
+  const api = fakeApi({ mints: () => Promise.resolve(mintList()) })
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('mints')
+  await ui.type('\x1b[B') // onto the untrusted one
+  await ui.type('t')
+  await ui.flush(6)
+
+  t.is(
+    api.calls.find(([name]) => name === 'trustMint')?.[1],
+    'https://quarantined.example',
+    'T on an untrusted mint trusts it'
+  )
+  t.absent(ui.screen().includes('Untrust'), 'and asks nothing, because nothing is lost by it')
+
+  ui.app.unmount()
+})
+
+test('untrusting a mint that holds something is asked about first', async (t) => {
+  const api = fakeApi({ mints: () => Promise.resolve(mintList()) })
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('mints')
+  await ui.type('t')
+
+  t.ok(ui.screen().includes('Untrust https://mint.example?'), 'the question names the mint')
+  t.ok(ui.screen().includes('8000 sat'), 'and what stops being spendable')
+  t.absent(
+    api.calls.some(([name]) => name === 'untrustMint'),
+    'nothing has moved while the question stands'
+  )
+
+  await ui.type('n')
+  await ui.flush(6)
+  t.absent(
+    api.calls.some(([name]) => name === 'untrustMint'),
+    'and refusing leaves it trusted'
+  )
+
+  await ui.type('t')
+  await ui.type('y')
+  await ui.flush(6)
+  t.is(
+    api.calls.find(([name]) => name === 'untrustMint')?.[1],
+    'https://mint.example',
+    'accepting untrusts it'
+  )
+
+  ui.app.unmount()
+})
+
+test('untrusting a mint holding nothing needs no question', async (t) => {
+  const empty = [{ mintUrl: 'https://empty.example', trusted: true, units: [] }]
+  const api = fakeApi({ mints: () => Promise.resolve(empty) })
+  const ui = mount(api, { columns: 96 })
+  await ui.flush()
+
+  await ui.pick('mints')
+  await ui.type('t')
+  await ui.flush(6)
+
+  t.is(
+    api.calls.find(([name]) => name === 'untrustMint')?.[1],
+    'https://empty.example',
+    'there is nothing to lose, so there is nothing to ask'
+  )
 
   ui.app.unmount()
 })
@@ -1225,8 +1582,8 @@ test('a wallet with nothing in it says so rather than showing an empty box', asy
   const ui = mount(api, { columns: 96 })
   await ui.flush()
 
-  await ui.pick('balances')
-  t.ok(ui.screen().includes('no ecash yet'), 'the screen says there is nothing to show')
+  await ui.pick('mints')
+  t.ok(ui.screen().includes('no mints yet'), 'the screen says there is nothing to show')
 
   ui.app.unmount()
 })
@@ -1385,7 +1742,7 @@ test('escape leaves the menu on the action it just came out of', async (t) => {
 
   // Not just the first one: an action from each group, since the gaps between them are
   // where an index and a row number stop agreeing.
-  for (const action of ['balances', 'withdraw', 'nutzap']) {
+  for (const action of ['mints', 'withdraw', 'nutzap']) {
     await ui.pick(action)
     await ui.type('\x1b')
     t.ok(chosen().includes(action), `coming back from ${action} leaves the marker on it`)

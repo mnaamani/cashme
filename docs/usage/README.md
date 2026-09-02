@@ -16,6 +16,7 @@ Run `cashme <command> --help` for any command, or `cashme --help` for the full l
 
 - [ui](../../README.md) — the whole wallet on one screen, and what bare `cashme` runs
 - [balance](balance.md) — what this wallet can spend, per mint and in total
+- [mints](mints.md) — which mints this wallet trusts, and trusting or untrusting one
 - [deposit](deposit.md) — mint new ecash by paying a lightning invoice
 - [withdraw](withdraw.md) — melt ecash back into lightning sats
 - [give](give.md) — hand a token to a nearby device, or print it as text or a QR code

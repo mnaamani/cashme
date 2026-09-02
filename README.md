@@ -51,7 +51,8 @@ QR code, for you to carry across whatever channel you trust.
 
 ```sh
 cashme balance                                  # per mint and in total
-cashme deposit --amount 100                     # mint ecash by paying a lightning invoice
+cashme mints                                    # which mints this wallet trusts
+cashme deposit --amount 100 --mint https://...  # mint ecash by paying a lightning invoice
 cashme withdraw --invoice lnbc...               # melt ecash back into lightning
 cashme get                                      # wait for a neighbour to pay you
 cashme give --public-key a1b2c3 --amount 21     # pay one, over bluetooth
@@ -59,7 +60,7 @@ cashme give --amount 21 --qr                    # or hand the token over yoursel
 cashme nutzap --pubkey npub1... --sats 21       # ecash to a nostr user (NIP-61)
 cashme zap --pubkey npub1... --sats 21          # lightning zap with a receipt (NIP-57)
 cashme pending                                  # sends still out in the world
-cashme restore                                  # rebuild proofs the wallet lost
+cashme restore --mint https://...               # rebuild proofs the wallet lost
 ```
 
 `--lan` and `--dht` swap the radio for the local network or the hyperdht; `--proxy` sends

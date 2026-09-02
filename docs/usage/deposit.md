@@ -4,7 +4,6 @@ Mint new ecash by paying a lightning invoice. `cashme` prints the invoice — to
 its own line — and waits for the mint to see it paid:
 
 ```sh
-cashme deposit --amount 100
 cashme deposit --amount 100 --mint https://mint.example.com
 cashme deposit --amount 100 --unit sat --mint https://mint.example.com
 ```
@@ -24,5 +23,16 @@ millisats.
 Stopping the wait does not lose the deposit: if the invoice was paid, the next `cashme` to
 open the wallet redeems it and says so, before it prints anything else.
 
-Without `--mint` this uses `https://testnut.cashu.space`, a **testing mint whose invoices
-pay themselves and whose ecash is worthless**. Name a real mint before expecting real money.
+## Naming the mint
+
+`--mint` is required and this wallet has no default. Which mint to deposit at is the
+decision to trust it — to hold a claim against whoever runs it, and to let a later send be
+funded from it — and that is not a decision a wallet should make quietly on the one run that
+puts money in. See [mints](mints.md).
+
+Run it without `--mint` and the error lists the mints this wallet already trusts, since one
+of them is usually the answer:
+
+```
+--mint is required — this wallet trusts https://mint.example.com
+```

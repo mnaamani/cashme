@@ -12,6 +12,7 @@ import { appName, isDev } from './lib/cli/env.mjs'
 import {
   root,
   balance,
+  mints,
   deposit,
   give,
   get,
@@ -28,6 +29,7 @@ import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
 import { configureNetwork, proxyFailure, proxyInForce, interfaceInForce } from './lib/net.mjs'
 import { configureAddress } from './lib/cli/address.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
+import { run as runMints } from './lib/cli/mints.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runWithdraw } from './lib/cli/withdraw.mjs'
 import { run as runGive } from './lib/cli/give.mjs'
@@ -46,6 +48,7 @@ const debug = debuglog('cashme:app')
 // prints a stack trace. We want the message only, so dispatch by hand.
 const handlers = new Map([
   [balance.name, runBalance],
+  [mints.name, runMints],
   [deposit.name, runDeposit],
   [withdraw.name, runWithdraw],
   [give.name, runGive],

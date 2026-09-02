@@ -7,7 +7,7 @@
 // test/integration/mint.test.mjs; this is the wiring under it.
 import '../lib/polyfills.mjs'
 import test from 'brittle'
-import { get, root } from '../lib/cli/commands.mjs'
+import { get, mints, root } from '../lib/cli/commands.mjs'
 
 const flags = (argv) => {
   root.parse(argv)
@@ -28,4 +28,24 @@ test('get --mint names the mints a run may receive from', (t) => {
 
   t.absent(flags(['get']).mint, 'and nothing is pre-approved without it')
   t.ok(get.name, 'the command is the one the CLI dispatches on')
+})
+
+test('mints reads the trust list, and moves one mint at a time', (t) => {
+  t.is(flags(['mints', '--trust', 'https://mint.example']).trust, 'https://mint.example')
+  t.is(flags(['mints', '--untrust', 'https://mint.example']).untrust, 'https://mint.example')
+
+  // Not repeatable, unlike `get --mint`: this one is a decision about a single mint, and a
+  // list would make it ambiguous which the confirmation was about.
+  t.is(
+    flags(['mints', '--trust', 'https://one.example', '--trust', 'https://two.example']).trust,
+    'https://two.example',
+    'a second --trust replaces the first rather than adding to it'
+  )
+
+  t.ok(flags(['mints', '--untrust', 'https://mint.example', '--yes']).yes, '--yes skips the ask')
+  t.ok(flags(['mints', '--untrust', 'https://mint.example', '-y']).yes, 'short form too')
+
+  t.absent(flags(['mints']).trust, 'and with no flags it only reads')
+  t.absent(flags(['mints']).untrust)
+  t.ok(mints.name, 'the command is the one the CLI dispatches on')
 })

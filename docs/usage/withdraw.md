@@ -39,5 +39,5 @@ prompt reads a line from stdin, so `echo y | cashme withdraw ...` works too.
 > `cashme` checks the mint's `input_fee_ppk` against the quote and refuses such payments
 > before reserving anything, naming the smallest total that could work there. Above that
 > floor it goes ahead, and if coco still comes up short the operation rolls back with the
-> balance unchanged. The default mint, `testnut.cashu.space`, charges `input_fee_ppk: 100`,
+> balance unchanged. `testnut.cashu.space` charges `input_fee_ppk: 100`, for instance,
 > putting its floor at 11 sat; a mint with no input fee has none.
