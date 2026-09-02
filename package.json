@@ -18,6 +18,7 @@
     "notices:check": "node scripts/notices.js --check",
     "start": "bare bin.mjs --no-updates",
     "make": "node scripts/make.js",
+    "install:local": "node scripts/install-local.js",
     "stage": "bash scripts/stage.sh",
     "make:darwin-arm64": "bare-build --name cashme --standalone --host darwin-arm64 --out ./out/darwin-arm64 bin.mjs && node scripts/notices.js --copy-to ./out/darwin-arm64",
     "make:darwin-x64": "bare-build --name cashme --standalone --host darwin-x64 --out ./out/darwin-x64 bin.mjs && node scripts/notices.js --copy-to ./out/darwin-x64",
