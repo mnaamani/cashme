@@ -1,6 +1,6 @@
 {
   "name": "cashme",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A cashu wallet in your terminal, send and receive ecash over Bluetooth.",
   "private": true,
   "workspaces": [
