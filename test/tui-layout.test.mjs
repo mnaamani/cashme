@@ -44,6 +44,18 @@ test('grow shares out what is left, and the total still fits', (t) => {
   t.ok(lines[0].trimEnd().endsWith('right'), 'and the spacer pushes the last one over')
 })
 
+test('children with different grow factors share the slack without overflowing', (t) => {
+  // The remainder the floors leave over goes to the last growing child. Handing it to the
+  // largest factor instead meant every child after that one was still paid its own share,
+  // so the row came to more than it was given and had its right-hand end cut off.
+  const lines = render(
+    row({ gap: 1 }, text('a', { grow: 2 }), text('b', { grow: 1 }), text('end')),
+    20
+  )
+  t.is(width(lines[0]), 20, 'the row is exactly as wide as it was given')
+  t.ok(lines[0].trimEnd().endsWith('end'), 'so the last child is not cut off the end of it')
+})
+
 test('a column taller than its content pushes the slack into the growing child', (t) => {
   const lines = render(
     column({ height: 6 }, text('header'), spacer({ grow: 1 }), text('footer')),

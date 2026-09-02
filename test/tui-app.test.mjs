@@ -26,6 +26,7 @@ function fakeApi(overrides = {}) {
 
   return {
     calls,
+    defaultUnit: 'sat',
     mints: record('mints', [
       {
         mintUrl: 'https://mint.example',
@@ -171,7 +172,7 @@ const ACTIONS = [
   'in flight',
   'deposit',
   'give',
-  'receive',
+  'get',
   'withdraw',
   'zap',
   'nutzap'
@@ -360,7 +361,7 @@ test('a token from an unknown mint is not claimed until the question is answered
   const ui = mount(api)
   await ui.flush()
 
-  await ui.pick('receive')
+  await ui.pick('get')
   await ui.type('\r') // paste is the first source; enter commits it and opens the field
   await ui.type('cashuBtoken')
   await ui.enter(2) // out of the field, onto the button, then press it
@@ -390,7 +391,7 @@ test('answering no leaves the mint untrusted and the token unclaimed', async (t)
   const ui = mount(api)
   await ui.flush()
 
-  await ui.pick('receive')
+  await ui.pick('get')
   await ui.type('\r')
   await ui.type('cashuBtoken')
   await ui.enter(2)
@@ -414,7 +415,7 @@ test('pasting is opened with a second enter, since it has something to type into
   const ui = mount(api)
   await ui.flush()
 
-  await ui.pick('receive')
+  await ui.pick('get')
   t.ok(ui.screen().includes('Enter to paste a token'), 'the keys say what enter will do here')
 
   // 'k' is up to a selection list and a character to a text field. Typing the token before
@@ -467,7 +468,7 @@ test('a source with nothing to type starts on one enter', async (t) => {
   const ui = mount(api)
   await ui.flush()
 
-  await ui.pick('receive')
+  await ui.pick('get')
   await ui.type('\x1b[B') // bluetooth
   t.ok(ui.screen().includes('Enter starts listening'), 'the screen says so before it happens')
 
@@ -488,7 +489,7 @@ test('the local network is a wire of its own on both sides', async (t) => {
   await ui.flush()
 
   // Receiving: it listens, and the address it hands out is a prefix-matched one.
-  await ui.pick('receive')
+  await ui.pick('get')
   await ui.type('\x1b[B')
   await ui.type('\x1b[B') // local network
   await ui.type('\r')
@@ -525,7 +526,7 @@ test('giving over the local network is aimed at that wire and says so', async (t
   await ui.type('21')
   await ui.type('\t')
   await ui.type('deadbeef')
-  await ui.enter(3)
+  await ui.enter(4) // past the mint and unit fields, onto the button, then press it
 
   t.ok(ui.screen().includes('looking on the local network'), 'the wire is named while it waits')
 
@@ -537,7 +538,7 @@ test('ctrl-v reads the clipboard into the token field', async (t) => {
   const ui = mount(api)
   await ui.flush()
 
-  await ui.pick('receive')
+  await ui.pick('get')
   await ui.type('\r')
   t.ok(ui.screen().includes('Ctrl-V to paste'), 'the key is offered where it works')
 
@@ -564,7 +565,7 @@ test('a clipboard with nothing to read says so rather than failing quietly', asy
   const ui = mount(api)
   await ui.flush()
 
-  await ui.pick('receive')
+  await ui.pick('get')
   await ui.type('\r')
   await ui.type('\x16')
 
@@ -579,7 +580,7 @@ test('listening shows the address a sender has to be given, and copies it', asyn
   const ui = mount(api)
   await ui.flush()
 
-  await ui.pick('receive')
+  await ui.pick('get')
   t.absent(ui.screen().includes('your address'), 'there is no address before a wire is up')
 
   await ui.type('\x1b[B') // bluetooth
@@ -608,7 +609,7 @@ test('the hyperdht address is presented as the whole key, since a prefix will no
   const ui = mount(fakeApi())
   await ui.flush()
 
-  await ui.pick('receive')
+  await ui.pick('get')
   await ui.type('\x1b[F') // end of the list is the hyperdht
   await ui.type('\r')
 
@@ -644,6 +645,115 @@ test('withdraw quotes before it spends, and spends only once confirmed', async (
   ui.app.unmount()
 })
 
+test('a second withdraw is confirmed too, rather than quoting into a screen that acts', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('withdraw')
+  await ui.type('lnbc1first')
+  await ui.enter(3)
+  await ui.type('y')
+  t.ok(ui.screen().includes('paid'), 'the first one is paid')
+
+  // The finished payment used to be what the screen read to decide whether anything had
+  // been spent yet, so the second plan arrived with no question in front of it.
+  await ui.type('lnbc1second')
+  await ui.enter(3)
+  t.ok(ui.screen().includes('Pay this invoice?'), 'the second is asked about as well')
+  t.is(
+    api.calls.filter(([name]) => name === 'settleWithdraw').length,
+    1,
+    'and nothing is spent while that question stands'
+  )
+
+  ui.app.unmount()
+})
+
+test('a second nutzap is confirmed too, so its reserved proofs keep a way back', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('nutzap')
+  await ui.type('npub1first')
+  await ui.enter()
+  await ui.type('21')
+  await ui.enter(4) // past the mint and comment fields, onto the button, then press it
+  await ui.type('y')
+  t.ok(ui.screen().includes('nutzapped'), 'the first one is sent')
+
+  await ui.type('\x1b[B') // enter stops on the button, so the arrows go round again
+  await ui.enter(5) // back down the four fields, onto the button, then press it
+  t.ok(ui.screen().includes('Nutzap'), 'the second lookup is asked about as well')
+  t.is(
+    api.calls.filter(([name]) => name === 'settleNutzap').length,
+    1,
+    'nothing is published while that question stands'
+  )
+  // Refusing is the path that hands the reserved proofs back, and it only exists while the
+  // question is on screen.
+  await ui.type('n')
+  t.ok(
+    api.calls.some(([name]) => name === 'cancelNutzap'),
+    'and refusing gives the proofs back'
+  )
+
+  ui.app.unmount()
+})
+
+test('c is the copy key only where it cannot be a character being typed', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('give')
+  await ui.type('\r') // hand over
+  await ui.type('21')
+  await ui.enter(4)
+  t.ok(ui.screen().includes('cashuBtoken'), 'the token is on screen')
+
+  // The token stays up while the form below it takes keystrokes again, and a mint url is
+  // full of c's — so they have to reach the field rather than the clipboard.
+  // Enter stops on the button, so the arrows are what go round to the mint field.
+  await ui.type('\x1b[B') // round to the amount
+  await ui.type('\x1b[B') // and on to the mint
+  await ui.type('cashu.example')
+  t.ok(ui.screen().includes('cashu.example'), 'the url is typed, not swallowed')
+  t.absent(
+    api.calls.some(([name]) => name === 'copy'),
+    'and nothing was copied'
+  )
+
+  ui.app.unmount()
+})
+
+test('a listening session says how many it took, not just that it stopped', async (t) => {
+  const api = fakeApi({
+    trusted: () => Promise.resolve(true),
+    listen: ({ cancelled, onaddress, ontoken }) => {
+      onaddress('a1b2c3d4'.repeat(8))
+      return (async () => {
+        await ontoken('cashuBone')
+        await cancelled
+      })()
+    }
+  })
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('get')
+  await ui.type('\x1b[B') // bluetooth
+  await ui.type('\r')
+  await ui.flush(8)
+  await ui.type('\x1b') // stop listening
+  await ui.flush(8)
+
+  t.ok(ui.screen().includes('took 1'), 'the count comes from what actually went through')
+
+  ui.app.unmount()
+})
+
 test('give hands the token over and says the proofs are no longer ours to keep', async (t) => {
   const api = fakeApi()
   const ui = mount(api)
@@ -653,7 +763,7 @@ test('give hands the token over and says the proofs are no longer ours to keep',
   t.ok(ui.screen().includes('hand over'), 'the ways to give are listed')
   await ui.type('\r') // hand over is the first method; enter commits it and opens the form
   await ui.type('21')
-  await ui.enter(3) // past the mint field, onto the button, then press it
+  await ui.enter(4) // past the mint and unit fields, onto the button, then press it
 
   t.ok(ui.screen().includes('cashuBtoken'), 'the token is on screen')
   t.ok(
@@ -681,7 +791,7 @@ test('escape while the mint is being asked stops the send and hands the proofs b
   await ui.pick('give')
   await ui.type('\r')
   await ui.type('21')
-  await ui.enter(3)
+  await ui.enter(4) // past the mint and unit fields, onto the button, then press it
   t.ok(ui.screen().includes('reserving proofs'), 'the send is under way')
 
   await ui.type('\x1b') // the user gives up while the mint is still being asked
@@ -701,6 +811,56 @@ test('escape while the mint is being asked stops the send and hands the proofs b
   ui.app.unmount()
 })
 
+test('give spends in the unit it was told to, not always in sats', async (t) => {
+  const api = fakeApi({ reach: () => new Promise(() => {}) })
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('give')
+  await ui.type('\x1b[B') // bluetooth
+  await ui.type('\r')
+  await ui.type('12')
+  await ui.type('\t')
+  await ui.type('deadbeef')
+  await ui.enter(2) // past the mint field, onto the unit
+  await ui.type('\x15') // ctrl-u empties it
+  await ui.type('usd')
+  await ui.enter(2) // onto the button, then press it
+
+  const call = api.calls.find(([name]) => name === 'prepareGive')
+  t.is(call[1].unit, 'usd', 'the unit typed is the one the proofs are reserved in')
+
+  // And it is the unit the session would name if it had to hand those proofs back after
+  // the screen was gone, which is the message the user reads in their shell.
+  t.is(api.holding()[0].unit, 'usd', 'and the one the session owes them back in')
+
+  ui.app.unmount()
+})
+
+test('an empty unit falls back rather than reserving in nothing', async (t) => {
+  const api = fakeApi({ reach: () => new Promise(() => {}) })
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('give')
+  await ui.type('\x1b[B') // bluetooth
+  await ui.type('\r')
+  await ui.type('12')
+  await ui.type('\t')
+  await ui.type('deadbeef')
+  await ui.enter(2) // past the mint field, onto the unit
+  await ui.type('\x15') // ctrl-u empties it
+  await ui.enter(2) // onto the button, then press it
+
+  t.is(
+    api.calls.find(([name]) => name === 'prepareGive')[1].unit,
+    'sat',
+    "an empty field means the wallet's own unit, not an empty one"
+  )
+
+  ui.app.unmount()
+})
+
 test('a send still holding proofs is registered so the session can give them back', async (t) => {
   const api = fakeApi({ reach: () => new Promise(() => {}) })
   const ui = mount(api)
@@ -712,7 +872,7 @@ test('a send still holding proofs is registered so the session can give them bac
   await ui.type('21')
   await ui.type('\t')
   await ui.type('deadbeef')
-  await ui.enter(3) // past mint, onto the button, then press it
+  await ui.enter(4) // past the mint and unit fields, onto the button, then press it
 
   const owed = api.holding()
   t.is(owed.length, 1, 'the reserved proofs are on the books while the peer is looked for')
@@ -739,7 +899,7 @@ test('once the token exists nothing is owed back, because it may already be thei
   await ui.pick('give')
   await ui.type('\r')
   await ui.type('21')
-  await ui.enter(3)
+  await ui.enter(4)
 
   t.ok(ui.screen().includes('cashuBtoken'), 'the token is out there')
   t.is(api.holding().length, 0, 'so the session has nothing it can simply hand back')
@@ -907,7 +1067,7 @@ test('a token that wraps can be dragged out with a mouse, and copied with a key'
   await ui.pick('give')
   await ui.type('\r') // hand over
   await ui.type('21')
-  await ui.enter(3)
+  await ui.enter(4) // past the mint and unit fields, onto the button, then press it
 
   const lines = ui.screen().split('\n')
   const first = lines.findIndex((line) => line.includes('cashuB'))
@@ -1260,6 +1420,26 @@ test('the layout survives a terminal being resized under it', async (t) => {
   t.ok(ui.screen().includes('8000 sat'), 'and the wallet is still on screen')
 
   ui.app.unmount()
+})
+
+test('a screen that throws hands the error back rather than closing quietly', async (t) => {
+  const stdout = new FakeStdout({ columns: 80, rows: 24 })
+  const stdin = new FakeStdin()
+  const boom = new Error('the screen fell over')
+  function Broken() {
+    throw boom
+  }
+
+  // `cashme ui` reports whatever the session ended with, so an error that ends it has to
+  // be the value it ends with — unmounting first and reporting after resolved with nothing
+  // and lost it on the way out.
+  const app = render(h(Broken), { stdout, stdin })
+  const result = await app.waitUntilExit()
+  t.is(result, boom, 'the error is what the session resolves with')
+  t.ok(
+    stdout.writes.join('').includes('\x1b[?1049l'),
+    'and the terminal is put back on the way out'
+  )
 })
 
 test('the frame stops one cell short of the terminal in both directions', async (t) => {

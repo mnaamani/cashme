@@ -36,7 +36,7 @@ cashme --help     # or the list of commands, if you would rather type them
 ```
 
 Run on its own, `cashme` opens a full-screen terminal UI: balances, sends still in flight,
-and the deposit, give, receive and withdraw flows, on one screen. Piped or run from a
+and the deposit, give, get and withdraw flows, on one screen. Piped or run from a
 script it prints the help instead, since there is no terminal to paint on.
 
 The wallet keeps itself up to date in the background from its own pear link, so it never
