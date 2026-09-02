@@ -728,6 +728,47 @@ test('c is the copy key only where it cannot be a character being typed', async 
   ui.app.unmount()
 })
 
+test('a token refused over a wire is kept, since the sender has already let go of it', async (t) => {
+  // The wire acknowledges a token the moment it parses — before the mint question is even
+  // put — so by the time it is refused the sender has finalized its send and this string is
+  // the only copy of the money left. Losing it would make declining a mint cost the user
+  // the ecash rather than the mint.
+  const { tokenQueue } = await import('../lib/token-wire.mjs')
+  const arrived = 'cashuBfromastranger'
+  const api = fakeApi({
+    listen: ({ cancelled, onaddress, ontoken }) => {
+      onaddress('a1b2c3d4'.repeat(8))
+      // The real wires hand tokens over through this queue, and it is the queue that
+      // decides what a throwing handler means.
+      const queue = tokenQueue(ontoken)
+      return queue.enqueue(arrived).then(() => cancelled)
+    }
+  })
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('get')
+  await ui.type('\x1b[B') // bluetooth
+  await ui.type('\r')
+  await ui.flush(8)
+
+  t.ok(ui.screen().includes('never used'), 'the mint is put to the user')
+  await ui.type('n')
+  await ui.flush(8)
+
+  t.absent(
+    api.calls.some(([name]) => name === 'claim'),
+    'refusing claims nothing'
+  )
+  t.absent(
+    api.calls.some(([name]) => name === 'trust'),
+    'and trusts nothing'
+  )
+  t.ok(ui.screen().includes(arrived), 'but the token itself is in the log to be claimed later')
+
+  ui.app.unmount()
+})
+
 test('a listening session says how many it took, not just that it stopped', async (t) => {
   const api = fakeApi({
     trusted: () => Promise.resolve(true),
@@ -1366,7 +1407,10 @@ test('a confirmation and its answer keys fit on a short terminal', async (t) => 
   for (const [action, keys] of [
     ['withdraw', ['lnbc1test', '\r', '\r', '\r']],
     ['zap', ['npub1someone', '\r', '21', '\r', '\r', '\r']],
-    ['nutzap', ['npub1someone', '\r', '21', '\r', '\r', '\r', '\r']]
+    ['nutzap', ['npub1someone', '\r', '21', '\r', '\r', '\r', '\r']],
+    // The trust question has the most to lose by being cut off: it is the one that decides
+    // whether a stranger's mint goes into this wallet for good.
+    ['get', ['\r', 'cashuBfromastranger', '\r', '\r']]
   ]) {
     for (const rows of [24, 30, 40]) {
       const ui = mount(fakeApi(), { columns: 96, rows })
@@ -1380,6 +1424,10 @@ test('a confirmation and its answer keys fit on a short terminal', async (t) => 
         `${action} at ${rows} rows: the way to say yes is on screen`
       )
       t.ok(screen.includes('N to refuse'), `${action} at ${rows} rows: and the way to say no`)
+      t.ok(
+        screen.includes('?'),
+        `${action} at ${rows} rows: and the question those answer is on screen too`
+      )
 
       ui.app.unmount()
     }
