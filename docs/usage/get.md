@@ -50,10 +50,24 @@ a fresh one per payment:
 cashme get --dht --stable
 ```
 
-That reusability is what it costs. Listening announces the key on the DHT together with the
-address — or the relay nodes — that reach this machine, so anyone you have ever given it to
-can afterwards check whether this wallet is online, and roughly from where, for as long as
-the wallet exists. It says nothing about the seed behind it, and no ecash is locked to it,
+It is not a hyperdht flag. Every wire ends in the same Noise handshake, so the key it
+chooses is the one presented on all three — bluetooth and the local network included — and
+one saved address reaches this wallet whichever way the sender finds it. It is also
+available globally, before the command, so a whole session runs under it:
+
+```sh
+cashme --stable get --lan
+```
+
+That reusability is what it costs, and it costs something different on each wire. On the
+hyperdht, listening announces the key together with the address — or the relay nodes — that
+reach this machine, so anyone you have ever given it to can afterwards check whether this
+wallet is online, and roughly from where, for as long as the wallet exists. On bluetooth it
+is advertised on a public topic, so anyone scanning the room recognises this wallet session
+after session rather than seeing an unfamiliar key each time. On the local network it is
+handed to anyone who multicasts a query, which turns "a wallet is listening here" into
+"this wallet is here". A run-only key has none of those properties, which is why it remains
+the default. It says nothing about the seed behind it, and no ecash is locked to it,
 but it is a lasting public identifier for the wallet — worth it for a key you hand out
 once, not for a one-off payment from a stranger.
 

@@ -26,6 +26,7 @@ import {
 import { closeWallet } from './lib/cli/session.mjs'
 import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
 import { configureNetwork, proxyFailure, proxyInForce, interfaceInForce } from './lib/net.mjs'
+import { configureAddress } from './lib/cli/address.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runWithdraw } from './lib/cli/withdraw.mjs'
@@ -93,6 +94,8 @@ if (root.flags.version) {
 // stops the run here rather than halfway through a payment.
 try {
   configureNetwork({ proxy: root.flags.proxy, iface: root.flags.dhtInterface })
+  // Which hyperdht address this run presents, unless a command overrides it for itself.
+  configureAddress({ stable: root.flags.stable })
   const named = root.current
   const handover = named?.name === get.name || named?.name === give.name
   const overDht = handover && named.flags.dht
