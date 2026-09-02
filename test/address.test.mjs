@@ -8,13 +8,13 @@
 import '../lib/polyfills.mjs'
 import test from 'brittle'
 import process from 'bare-process'
-import { dhtIdentity, warnStable } from '../lib/cli/address.mjs'
+import { wireIdentity } from '../lib/cli/address.mjs'
 import { transportFrom, BLE, LAN, DHT } from '../lib/cli/transport.mjs'
 import { dhtAddress } from '../lib/dht.mjs'
 import { seedFromHex } from '../lib/seed.mjs'
 import { give, get, root } from '../lib/cli/commands.mjs'
 
-// The one thing dhtIdentity reads off a wallet.
+// The one thing wireIdentity reads off a wallet.
 const SEED_HEX = 'a1'.repeat(64)
 const wallet = { repos: { seedHex: SEED_HEX } }
 
@@ -50,9 +50,9 @@ function quietly(fn) {
 }
 
 test('without --stable a run gets a key of its own, on both sides of the link', (t) => {
-  const first = quietly(() => dhtIdentity(wallet, {}))
-  const second = quietly(() => dhtIdentity(wallet, {}))
-  const listening = quietly(() => dhtIdentity(wallet, {}, { listening: true }))
+  const first = quietly(() => wireIdentity(wallet, {}))
+  const second = quietly(() => wireIdentity(wallet, {}))
+  const listening = quietly(() => wireIdentity(wallet, {}, { listening: true }))
 
   t.not(hex(first), hex(second), 'a second run is not the first one again')
   t.not(hex(first), hex(listening), 'and receiving is no different from sending')
@@ -64,7 +64,7 @@ test('without --stable a run gets a key of its own, on both sides of the link', 
 test("--stable is the wallet's own address, the same every run", (t) => {
   const own = hex(dhtAddress(seedFromHex(SEED_HEX)))
 
-  const stable = (opts) => hex(quietly(() => dhtIdentity(wallet, { stable: true }, opts)))
+  const stable = (opts) => hex(quietly(() => wireIdentity(wallet, { stable: true }, opts)))
 
   t.is(stable(), own)
   t.is(stable(), own, 'unchanged by being asked twice')
@@ -73,48 +73,41 @@ test("--stable is the wallet's own address, the same every run", (t) => {
 
 test('a run says which kind of key it is on', (t) => {
   t.ok(
-    /this run only/.test(said(() => dhtIdentity(wallet, {}, { listening: true }))),
+    /this run only/.test(said(() => wireIdentity(wallet, {}, { listening: true }))),
     'a receiver is told the sender needs the key now'
   )
   t.ok(
     /the same every run/.test(
-      said(() => dhtIdentity(wallet, { stable: true }, { listening: true }))
+      said(() => wireIdentity(wallet, { stable: true }, { listening: true }))
     ),
     'and told when it is instead the one they can keep'
   )
   t.ok(
-    /one-run key/.test(said(() => dhtIdentity(wallet, {}))),
+    /one-run key/.test(said(() => wireIdentity(wallet, {}))),
     'a sender is told this send is not tied to the wallet'
   )
   // Nothing to weigh on this one: the sender is presenting the address they already
   // announce, and asked for it.
   t.is(
-    said(() => dhtIdentity(wallet, { stable: true })),
+    said(() => wireIdentity(wallet, { stable: true })),
     '',
     'and nothing when they asked for it'
   )
 })
 
-test('--stable off the hyperdht is called redundant rather than ignored', (t) => {
-  t.ok(/redundant/.test(said(() => warnStable({ stable: true }, BLE))))
-  t.ok(
-    /local network/.test(said(() => warnStable({ stable: true }, LAN))),
-    'and names the wire it is redundant on'
-  )
-  t.is(
-    said(() => warnStable({ stable: true }, DHT)),
-    '',
-    'it does something with --dht'
-  )
-  t.is(
-    said(() => warnStable({}, DHT)),
-    '',
-    'and unasked for, there is nothing to say'
-  )
-  t.is(
-    said(() => warnStable({}, BLE)),
-    ''
-  )
+test('one identity serves every wire, so a stable key is the same on all three', (t) => {
+  // The three transports all end in the same Noise handshake, and each takes the keypair
+  // from here — so --stable is one address a sender can keep and reach this wallet on
+  // whichever way they find it, rather than a hyperdht-only choice.
+  const stable = hex(quietly(() => wireIdentity(wallet, { stable: true })))
+  const listening = hex(quietly(() => wireIdentity(wallet, { stable: true }, { listening: true })))
+  t.is(stable, listening, 'the same key whether sending or listening')
+
+  const again = hex(quietly(() => wireIdentity(wallet, { stable: true })))
+  t.is(again, stable, 'and the same key on the next run')
+
+  const runOnly = hex(quietly(() => wireIdentity(wallet, {})))
+  t.not(runOnly, stable, 'while the default is a key of this run alone')
 })
 
 // Which wire a run uses is read the same way by both commands, and the two network flags

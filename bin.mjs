@@ -20,11 +20,13 @@ import {
   zap,
   withdraw,
   restore,
+  ui,
   licenses
 } from './lib/cli/commands.mjs'
 import { closeWallet } from './lib/cli/session.mjs'
 import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
 import { configureNetwork, proxyFailure, proxyInForce, interfaceInForce } from './lib/net.mjs'
+import { configureAddress } from './lib/cli/address.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runWithdraw } from './lib/cli/withdraw.mjs'
@@ -34,6 +36,7 @@ import { run as runPending } from './lib/cli/pending.mjs'
 import { run as runNutzap } from './lib/cli/nutzap.mjs'
 import { run as runZap } from './lib/cli/zap.mjs'
 import { run as runRestore } from './lib/cli/restore.mjs'
+import { run as runTui, usable as uiUsable } from './lib/cli/tui.mjs'
 import { run as runLicenses } from './lib/cli/licenses.mjs'
 import { note, flush } from './lib/notes.mjs'
 
@@ -51,6 +54,7 @@ const handlers = new Map([
   [nutzap.name, runNutzap],
   [zap.name, runZap],
   [restore.name, runRestore],
+  [ui.name, runTui],
   [licenses.name, runLicenses]
 ])
 
@@ -70,8 +74,12 @@ try {
 // there on the runs that end in help, in a version, or in an error.
 const storage = root.flags.storage || (isDev ? null : path.join(persistent(), appName))
 const dir = storage || path.join(os.tmpdir(), 'pear', appName)
+// Nothing chose that directory: it is the temp one a dev build falls back to, and the
+// wallet in it is gone with the next reboot. Worth saying out loud here, and worth the UI
+// wearing a badge for — money put in it is not money kept.
+const ephemeral = !storage
 note('[app] binary:', process.execPath)
-note('[app] storage:', dir)
+note('[app] storage:', ephemeral ? `${dir} (temporary — dev build)` : dir)
 
 // paparam prints help but does not stop us running the command — without this,
 // `cashme get --help` would print its help and then sit waiting on bluetooth.
@@ -90,6 +98,8 @@ if (root.flags.version) {
 // stops the run here rather than halfway through a payment.
 try {
   configureNetwork({ proxy: root.flags.proxy, iface: root.flags.dhtInterface })
+  // Which hyperdht address this run presents, unless a command overrides it for itself.
+  configureAddress({ stable: root.flags.stable })
   const named = root.current
   const handover = named?.name === get.name || named?.name === give.name
   const overDht = handover && named.flags.dht
@@ -162,10 +172,17 @@ if (updates !== false) {
 
 try {
   const command = root.current
-  if (!command) {
-    console.log(root.help())
-  } else {
+  if (command) {
     await handlers.get(command.name)({ dir, flags: command.flags, command })
+  } else if (uiUsable()) {
+    // Bare `cashme` opens the wallet rather than explaining itself. Someone who ran it
+    // with nothing to say wants to see their money, and `--help` is still there for the
+    // other reading.
+    await runTui({ dir, flags: root.flags, ephemeral })
+  } else {
+    // No terminal to paint on — a pipe, a script, a cron job. The UI would only refuse,
+    // and refusing something nobody asked for is worse than answering the other question.
+    console.log(root.help())
   }
 } catch (err) {
   // A locked wallet or an unreachable mint is something the user can act on: print what

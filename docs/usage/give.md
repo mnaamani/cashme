@@ -76,13 +76,19 @@ it with `--stable` the key is their wallet's own and does not change, so it is w
 
 The link names you to them too. By default this wallet connects under a key of that run's
 own, recognisable to nobody. `--stable` (`-s`) sends under this wallet's own address — the
-same one its `cashme get --dht --stable` announces — so a receiver paid twice can tell both
-sends came from here: useful if they ever want to accept only from people they know, and a
+same one its `cashme get --stable` announces — so a receiver paid twice can tell both sends
+came from here: useful if they ever want to accept only from people they know, and a
 lasting identifier handed to everyone you pay otherwise.
 
 ```sh
 cashme give --dht --stable --public-key <64-hex-key> --amount 21
 ```
+
+It applies to every wire, not just this one: all three end in the same Noise handshake, so
+the key `--stable` chooses is what the receiver sees over bluetooth and the local network
+too. It can also be given before the command, which sets it for the whole run — and, in
+`cashme ui`, it is a session-wide setting shown in the top bar and switched on the settings
+screen.
 
 Everything else is as it is over bluetooth: the proofs are reserved first, Ctrl-C hands
 them back, and the receiver's acknowledgement is what settles the send. A peer that is not

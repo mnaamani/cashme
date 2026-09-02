@@ -5,10 +5,16 @@ devices over Bluetooth Low Energy (BLE), the local network or the hyperdht, with
 in between — or
 handed over as text or a QR code, for you to carry across whatever channel you trust.
 
+Run `cashme` on its own and it opens the whole wallet on one screen — that is the `ui`
+command, and it is what happens with no command given. The commands below are the other
+way in, and the way to get a token or an invoice out of this wallet and into something
+else.
+
 Run `cashme <command> --help` for any command, or `cashme --help` for the full list.
 
 ## Commands
 
+- [ui](../../README.md) — the whole wallet on one screen, and what bare `cashme` runs
 - [balance](balance.md) — what this wallet can spend, per mint and in total
 - [deposit](deposit.md) — mint new ecash by paying a lightning invoice
 - [withdraw](withdraw.md) — melt ecash back into lightning sats

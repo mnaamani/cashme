@@ -31,8 +31,13 @@ Every route puts the same standalone binary in `~/.local/bin/cashme` and puts th
 Open a new terminal, then:
 
 ```sh
-cashme --help
+cashme            # the whole wallet on one screen
+cashme --help     # or the list of commands, if you would rather type them
 ```
+
+Run on its own, `cashme` opens a full-screen terminal UI: balances, sends still in flight,
+and the deposit, give, receive and withdraw flows, on one screen. Piped or run from a
+script it prints the help instead, since there is no terminal to paint on.
 
 The wallet keeps itself up to date in the background from its own pear link, so it never
 needs reinstalling to move to a newer version. See [docs/installing.md](docs/installing.md)
