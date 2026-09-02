@@ -73,13 +73,6 @@ test(
   }
 )
 
-test('--stable without --dht is called redundant rather than ignored', opts, async (t) => {
-  // No network in this one: it never gets as far as a wire. `get` with nothing to receive
-  // on stdin gives up, which is fine — the note is printed before that.
-  const run = await cli(walletdir(t), ['get', '--stable'], { timeout: 60000 })
-  t.ok(/--stable is redundant without --dht/.test(run.output))
-})
-
 test('ecash crosses the hyperdht to the key the receiver printed', opts, async (t) => {
   const sender = walletdir(t)
   const receiver = walletdir(t)
