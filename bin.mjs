@@ -27,7 +27,7 @@ import {
   licenses
 } from './lib/cli/commands.mjs'
 import { closeWallet } from './lib/cli/session.mjs'
-import { spawnUpdater, runUpdater, updateWindow } from './lib/updater.mjs'
+import { spawnUpdater, runUpdater, updateWindow, updatesDisabled } from './lib/updater.mjs'
 import { configureNetwork, proxyFailure, proxyInForce, interfaceInForce } from './lib/net.mjs'
 import { configureAddress } from './lib/cli/address.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
@@ -123,6 +123,13 @@ if (wearing && root.current && root.current.name !== ui.name) {
 }
 note('[app] binary:', process.execPath)
 note('[app] storage:', ephemeral ? `${dir} (temporary — dev build)` : dir)
+// And a third, on the runs it applies to: whether this wallet is going to keep itself up to
+// date. A flag is on the command line where whoever typed it can see it, so --no-updates
+// says nothing here — but an exported variable is invisible, and this one quietly holds a
+// wallet at the version it already has. That is a thing to be told, not to work out.
+// null when the updater is going to run, otherwise what stopped it.
+const noUpdates = updatesDisabled(root.flags.updates)
+if (noUpdates === 'CASHME_NO_UPDATES') note('[app] updates: disabled by CASHME_NO_UPDATES')
 
 // paparam prints help but does not stop us running the command — without this,
 // `cashme get --help` would print its help and then sit waiting on bluetooth.
@@ -180,7 +187,6 @@ try {
   Bare.exit(1)
 }
 
-const updates = root.flags.updates
 let wait
 try {
   wait = updateWindow(root.flags.updateWindow)
@@ -196,14 +202,14 @@ if (root.flags.updater) {
   Bare.exit()
 }
 
-debug('updates:', updates === false ? 'disabled' : 'enabled')
+debug('updates:', noUpdates ? `disabled (${noUpdates})` : 'enabled')
 
 // The updater is a detached process that fetches over the hyperdht, and inherits none of
 // this run's flags — so lib/updater.mjs forwards it the one that governs where its traffic
 // leaves from. Nothing else it does is covered by a flag here: a proxy cannot carry the
 // hyperdht any more than it can carry `give --dht`, which this run would have gone ahead
 // with too. `--no-updates` is how to say not to start it.
-if (updates !== false) {
+if (noUpdates === null) {
   try {
     spawnUpdater(dir, wait)
   } catch (err) {

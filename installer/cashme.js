@@ -14,7 +14,7 @@ const os = require('os')
 const path = require('path')
 const fs = require('fs')
 const { spawn, spawnSync } = require('child_process')
-const { isWindows } = require('which-runtime')
+const { isWindows, isLinux } = require('which-runtime')
 const goodbye = require('graceful-goodbye')
 const byteSize = require('tiny-byte-size')
 
@@ -65,14 +65,25 @@ function run() {
 
 // The pear network: no hosting, and the binary comes from whoever is seeding the link.
 async function install() {
+  libatomicCheck()
+
   const Install = require('pear-install')
 
   console.log('Fetching cashme from peers:', LINK)
 
-  const install = new Install({ link: LINK })
+  // Double pear-install's 30s, because that budget covers finding a peer as well as talking
+  // to one, and a cold swarm on a slow network can spend most of it on discovery alone.
+  const install = new Install({ link: LINK, timeout: 60_000 })
   let success = false
+  let dest = null
 
   if (isTTY) install.on('stats', printStats)
+  // pear-install decides where the binary lands, from the app's own package.json name — so
+  // take the path it reports rather than trusting BIN, which is this shim's guess at the
+  // same computation and would silently drift if either side changed.
+  install.on('app', (info) => {
+    if (info.dest && path.basename(info.dest) === path.basename(BIN)) dest = info.dest
+  })
   install.on('final', (result) => {
     success = result.success
   })
@@ -88,10 +99,35 @@ async function install() {
     await install.close()
   }
 
-  if (!success || !fs.existsSync(BIN)) throw new Error('no binary came back from the pear network')
+  if (!success) throw new Error('no binary came back from the pear network')
+  if (dest && dest !== BIN) throw new Error(`cashme installed to ${dest}, not ${BIN}`)
+  if (!fs.existsSync(BIN)) throw new Error('the install reported success but left no binary')
 
   quarantine()
   done()
+}
+
+// The prebuilt rocksdb that corestore loads links against libatomic, which a few distros
+// leave out of a base install. Without this the fetch dies on a require deep inside the
+// swarm stack, naming a library rather than the package that installs it. Borrowed from
+// pear-cli, which hit the same thing.
+function libatomicCheck() {
+  if (!isLinux) return
+  try {
+    require('rocksdb-native')
+  } catch {
+    throw new Error(`libatomic is missing, so the peer-to-peer fetch cannot start.
+
+Install it with your package manager:
+  Debian/Ubuntu   sudo apt install libatomic1
+  Fedora          sudo dnf install libatomic
+  RHEL/CentOS     sudo yum install libatomic
+  Arch            sudo pacman -S libatomic_ops
+  Alpine          sudo apk add libatomic
+
+Or skip the fetch entirely and install the release binary:
+  curl -fsSL https://raw.githubusercontent.com/mnaamani/cashme/main/install.sh | sh`)
+  }
 }
 
 // Strip Gatekeeper's quarantine tag, as install.sh does — and, as there, usually there is
@@ -119,8 +155,11 @@ function done() {
   // the command a second time. Straight to BIN, since PATH may not have caught up yet.
   if (process.argv.length > 2) return run()
 
+  // pear-install puts BIN_DIR on the PATH itself as it installs — the shell rc on unix, the
+  // user environment on windows — so this is a stale-shell notice, not a missing-PATH one.
+  // Either way 'cashme' works right now, because this shim is already on the PATH.
   if (!onPath(BIN_DIR)) {
-    console.log(`${BIN_DIR} is not on your PATH, but 'cashme' still works — this shim is.`)
+    console.log(`${BIN_DIR} was added to your PATH; open a new terminal to pick it up.`)
   }
   console.log('Run: cashme --help')
 }
@@ -134,6 +173,24 @@ function fail(err) {
   console.error('Could not install cashme:')
   console.error('  ' + err.message)
   console.error('')
+  // pear-install reports these as PearError codes. Both have a specific answer, and neither
+  // is helped by the generic 'try again' below.
+  if (err.code === 'ERR_NETWORK_TIMEOUT') {
+    console.error('Nothing answered for the link. Either nobody is seeding it right now, or')
+    console.error('this network blocks the swarm (UDP hole punching). A different network, or')
+    console.error('the release binary, will get past the second:')
+    console.error(
+      '  curl -fsSL https://raw.githubusercontent.com/mnaamani/cashme/main/install.sh | sh'
+    )
+    console.error('')
+  } else if (err.code === 'ERR_PERMISSION_REQUIRED') {
+    console.error(`Nothing here can write to ${BIN_DIR}. Fix its ownership, or install the`)
+    console.error('release binary somewhere you own:')
+    console.error(
+      '  curl -fsSL https://raw.githubusercontent.com/mnaamani/cashme/main/install.sh | sh -s -- --dir <path>'
+    )
+    console.error('')
+  }
   console.error('The wallet is fetched on first run, not by npm, so retry with:')
   console.error('  cashme')
   console.error('Rerunning npm install -g @cashme/cli would only reinstall this shim.')

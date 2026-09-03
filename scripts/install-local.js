@@ -46,8 +46,10 @@ if (!fs.existsSync(src)) {
 const dest = path.join(dir, name)
 
 // Copy beside the destination and rename over it, so the binary appears whole or not at
-// all, and so replacing one that is currently running does not write into it.
-const tmp = `${dest}.${process.pid}.tmp`
+// all, and so replacing one that is currently running does not write into it. The staging
+// name is hidden, matching install.sh, so a build killed mid-copy does not leave something
+// executable sitting in a PATH directory under a visible name.
+const tmp = path.join(dir, `.cashme.${process.pid}.tmp`)
 try {
   fs.mkdirSync(dir, { recursive: true })
   fs.copyFileSync(src, tmp)
@@ -64,5 +66,23 @@ try {
 
 console.log(`installed ${dest}`)
 
+// This binary is now in the position an installed one occupies, which includes being the
+// one the OTA updater manages. A standalone build is not `isDev` — that is only true under
+// `bare bin.mjs` — so every run spawns the update daemon, and the daemon applies updates by
+// replacing the binary at its own execPath. That is this file. So a background update will
+// silently swap the local build for the released one, and the next run is the release while
+// still looking like the dev install. Worth saying out loud, because the symptom is a change
+// that stops taking effect for no visible reason.
+if (!process.env.CASHME_NO_UPDATES) {
+  console.log('')
+  console.log('This is the path the OTA updater writes to, so a background update will replace')
+  console.log('this build with the released one. To hold it at what you just built:')
+  console.log('  export CASHME_NO_UPDATES=1')
+  console.log('or, for a single run: cashme --no-updates ...')
+}
+
 const paths = (process.env.PATH || '').split(path.delimiter)
-if (!paths.includes(dir)) console.log(`${dir} is not on your PATH.`)
+if (!paths.includes(dir)) {
+  console.log('')
+  console.log(`${dir} is not on your PATH. Add it, or run ${dest} directly.`)
+}

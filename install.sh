@@ -28,6 +28,7 @@ NO_MODIFY_PATH="${CASHME_NO_MODIFY_PATH:-}"
 FORCE="${CASHME_FORCE:-}"
 
 TMPDIR_CASHME=""
+STAGE=""
 
 main() {
   parse_args "$@"
@@ -175,15 +176,27 @@ place() {
   mkdir -p "$INSTALL_DIR" 2>/dev/null ||
     die "could not create $INSTALL_DIR — pick another with --dir"
 
-  # Move within the same filesystem when we can, so the binary appears whole or not at all;
-  # a cross-device rename falls back to cp, which cannot promise that.
-  if ! mv -f "$src" "$BIN" 2>/dev/null; then
-    cp -f "$src" "$BIN" 2>/dev/null ||
-      die "could not write $BIN
+  # Stage inside the destination directory rather than writing $BIN directly. That puts the
+  # staged file on the same filesystem as $BIN, which buys two things the previous copy-in-place
+  # could not:
+  #
+  #   - The install is atomic. The last step is a same-filesystem rename, so $BIN is either the
+  #     old binary or the new one, never a half-written file. Copying straight onto $BIN gave
+  #     that up whenever $TMPDIR_CASHME landed on a different filesystem — which is the common
+  #     case, since mktemp -d usually means /tmp.
+  #   - It survives replacing a binary that is currently running. Linux refuses to write to the
+  #     image of a live process (ETXTBSY), so `cp -f` onto $BIN failed if a cashme was open in
+  #     another terminal; rename just swaps the directory entry and leaves that process on the
+  #     old inode until it exits.
+  STAGE="$INSTALL_DIR/.cashme.install.$$"
+  cp -f "$src" "$STAGE" 2>/dev/null ||
+    die "could not write to $INSTALL_DIR
 If that directory needs root, rerun with --dir pointing somewhere you own,
 or: sudo sh -c 'CASHME_INSTALL_DIR=/usr/local/bin sh install.sh'"
-  fi
-  chmod 0755 "$BIN"
+
+  # Both of these apply to the staged file, so the binary is already executable and already
+  # untagged at the instant it appears at $BIN — no window where $BIN exists but will not run.
+  chmod 0755 "$STAGE"
 
   # Strip Gatekeeper's quarantine tag, so the first run is not a "cannot be opened because
   # the developer cannot be verified" dialog.
@@ -197,8 +210,11 @@ or: sudo sh -c 'CASHME_INSTALL_DIR=/usr/local/bin sh install.sh'"
   # verified above is then the only thing standing behind this binary, which is why that
   # check fails closed rather than being skipped when it cannot be made.
   if [ "$(uname -s)" = Darwin ] && command -v xattr >/dev/null 2>&1; then
-    xattr -d com.apple.quarantine "$BIN" >/dev/null 2>&1 || true
+    xattr -d com.apple.quarantine "$STAGE" >/dev/null 2>&1 || true
   fi
+
+  mv -f "$STAGE" "$BIN" || die "could not move the binary into place at $BIN"
+  STAGE=""
 }
 
 finish() {
@@ -290,6 +306,7 @@ die() {
 
 cleanup() {
   [ -n "$TMPDIR_CASHME" ] && rm -rf "$TMPDIR_CASHME"
+  [ -n "$STAGE" ] && rm -f "$STAGE"
   return 0
 }
 

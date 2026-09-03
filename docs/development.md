@@ -69,6 +69,19 @@ Per-run disable updates:
 npm start -- --no-updates
 ```
 
+Every run, which is what a build installed by `npm run install:local` needs:
+
+```sh
+export CASHME_NO_UPDATES=1
+```
+
+A standalone build is not a development run, whichever directory it was built in — `isDev`
+is `argv[0]` being `bare`, and nothing else. So a locally built binary installed over the
+released one at `~/.local/bin/cashme` spawns the updater like any other install, and the
+daemon applies updates by replacing the binary at its own `execPath`: the local build. The
+change under test then stops being the one running, with nothing on screen to say so.
+`CASHME_NO_UPDATES` is the setting that outlives the run and prevents it.
+
 ## Packages
 
 The proxy support lives in six packages of its own under `packages/`, because none of it is
