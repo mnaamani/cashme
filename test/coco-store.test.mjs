@@ -149,6 +149,22 @@ test('a write that fails is retried, not forgotten', async (t) => {
   t.ok(written.repos.counterRepository, 'the pending change landed on the next flush')
 })
 
+test('a failed final write still releases the wallet lock', async (t) => {
+  const dir = tmpdir(t)
+  const repos = await open(t, dir)
+  repos.dirty = true
+  repos.save = () => {
+    throw new Error('disk full')
+  }
+
+  t.exception(() => repos.close(), /disk full/)
+  t.absent(repos.lock.fd, 'the failed close did not keep the lock')
+
+  const next = new FileRepositories(dir)
+  await t.execution(next.init(), 'the next command can open the wallet')
+  next.close()
+})
+
 test('a failed transaction leaves the file holding the rolled back state', async (t) => {
   const dir = tmpdir(t)
   const repos = await open(t, dir)
