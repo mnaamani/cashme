@@ -314,7 +314,10 @@ test('an action opens on enter, and escape comes back to the menu', async (t) =>
   t.ok(ui.screen().includes('withdraw'), 'the withdraw screen is up')
 
   await ui.type('\x1b')
-  t.ok(ui.screen().includes('mint ecash against a lightning invoice'), 'escape is back at the menu')
+  // The menu is the one screen offering Q, because it is the one you can leave the wallet
+  // from — every other screen offers Esc instead. Checking for that rather than for a hint's
+  // wording, so rewriting the menu copy is not a test failure: this asks where we are.
+  t.ok(ui.screen().includes('Q to quit'), 'escape is back at the menu')
 
   ui.app.unmount()
 })
@@ -1397,7 +1400,7 @@ test('the menu shows the total and nothing about which mint it is at', async (t)
 
   t.ok(ui.screen().includes('8000 sat'), 'the total is on the menu')
   t.absent(ui.screen().includes('mint.example'), 'no mint is named there')
-  t.ok(ui.screen().includes('what each holds'), 'and the detail is an action away')
+  t.ok(ui.screen().includes('proofs for each'), 'and the detail is an action away')
 
   ui.app.unmount()
 })
@@ -1436,7 +1439,7 @@ test('the mints screen says what each mint holds, and in what', async (t) => {
   t.ok(screen.includes('  3 proofs'), 'a single-unit mint is not labelled')
 
   await ui.type('\x1b')
-  t.ok(ui.screen().includes('what each holds'), 'escape comes back to the menu')
+  t.ok(ui.screen().includes('Q to quit'), 'escape comes back to the menu')
 
   ui.app.unmount()
 })
