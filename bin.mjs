@@ -7,6 +7,7 @@ import process from 'bare-process'
 import debuglog from 'bare-debug-log'
 import os from 'bare-os'
 import path from 'bare-path'
+import tty from 'bare-tty'
 import pkg from './package.json'
 import { appName, isDev } from './lib/cli/env.mjs'
 import {
@@ -43,8 +44,34 @@ import { run as runRestore } from './lib/cli/restore.mjs'
 import { run as runTui, usable as uiUsable } from './lib/cli/tui.mjs'
 import { run as runLicenses } from './lib/cli/licenses.mjs'
 import { note, flush } from './lib/notes.mjs'
+import { banner, detectLevel, tint, SIGIL, STRAP } from './lib/art.mjs'
 
 const debug = debuglog('cashme:app')
+
+// Whether this run is going to end in help or a version, asked of argv before paparam
+// gets it. paparam prints help from inside parse(), so the only way to put anything above
+// that is to have said it already — and the wordmark belongs above the help rather than
+// somewhere in the middle of it. Sniffing argv for two spellings is the price; the flags
+// mean the same wherever on the line they appear, and no command has its own -h or -v.
+const argv = Bare.argv.slice(isDev ? 2 : 1)
+const asksToBeIntroduced = ['--help', '-h', '--version', '-v'].some((flag) => argv.includes(flag))
+
+// stdout, because that is where the help it sits above goes: a run piping the help into a
+// file gets the wordmark in it, in plain characters, which is the same thing without the
+// colour. Colour is the part that depends on there being a terminal to show it on.
+function introduce() {
+  const level = detectLevel(tty.isTTY(1))
+  for (const line of banner({
+    columns: process.stdout.columns || 80,
+    level,
+    version: `v${pkg.version}`
+  })) {
+    console.log(line)
+  }
+  console.log('')
+}
+
+if (asksToBeIntroduced) introduce()
 
 // paparam would run these itself, but a throwing handler goes through its bail(), which
 // prints a stack trace. We want the message only, so dispatch by hand.
@@ -84,6 +111,16 @@ const dir = storage || path.join(os.tmpdir(), 'pear', appName)
 // wallet in it is gone with the next reboot. Worth saying out loud here, and worth the UI
 // wearing a badge for — money put in it is not money kept.
 const ephemeral = !storage
+// One line saying which wallet is talking, on the runs that are a command rather than the
+// full-screen UI — which opens on the wordmark and has already said it. stderr, with the
+// rest of what a run says about itself, so it never lands in a piped token or invoice; and
+// only where there is a terminal to see it, so a script's log does not collect it.
+const wearing = detectLevel(tty.isTTY(2))
+if (wearing && root.current && root.current.name !== ui.name) {
+  note(
+    `${tint(SIGIL, 0.1, wearing)} ${tint(`v${pkg.version} ${STRAP}`, 0.85, wearing, { dim: true })}`
+  )
+}
 note('[app] binary:', process.execPath)
 note('[app] storage:', ephemeral ? `${dir} (temporary — dev build)` : dir)
 
@@ -188,6 +225,8 @@ try {
   } else {
     // No terminal to paint on — a pipe, a script, a cron job. The UI would only refuse,
     // and refusing something nobody asked for is worse than answering the other question.
+    // With the same wordmark over it that `--help` gets, since this is the same answer.
+    introduce()
     console.log(root.help())
   }
 } catch (err) {

@@ -140,6 +140,12 @@ agent is a different contract from Node's. Each package has its own tests
 - `lib/lan.mjs` - local-network transport: multicast discovery, then a TCP link
 - `lib/dht.mjs` - hyperdht transport for handing a token to a peer anywhere
 - `lib/clipboard.mjs` - the platform's clipboard program, for `give --copy`
+- `lib/tui/` - the full-screen UI: a small hooks runtime (`runtime.mjs`), the flexbox-ish
+  layout (`layout.mjs`), styled strings measured by column (`style.mjs`), the shared pieces
+  (`components.mjs`), the wordmark and the splash (`brand.mjs`), one file per screen in
+  `screens/`, and the fake tty a test drives it through (`testing.mjs`)
+- `lib/art.mjs` - the wordmark, the cyan-to-magenta ramp it is drawn in, the terminal
+  colour-depth check both the CLI and the UI ask, and the glitch the splash decays out of
 - `lib/notes.mjs` - the one stderr write path, and the flush a run exits through
 - `lib/nostr.mjs` - the keys, signed events and relay pool `nutzap` and `zap` need
 - `lib/websocket.mjs` - the browser-shaped WebSocket nostr-tools drives, over bare-ws
@@ -153,9 +159,15 @@ agent is a different contract from Node's. Each package has its own tests
 - `lib/constants.mjs`, `lib/polyfills.mjs` - defaults, and the browser globals Bare lacks
 - `app.js` - daemon launcher and updater resource
 - `scripts/make.js` - platform/arch build target selector
+- `scripts/screenshot.mjs`, `scripts/ansi-to-svg.mjs` - `npm run screenshots`: mounts the
+  real screens against a demo wallet and writes each painted frame to `docs/media/` as an
+  SVG. The images in the README are generated, not photographed, so a change to a pane
+  shows up as a diff in the picture of it
 - `test/index.js` - brittle-bare test entrypoint, requiring the suites below
 - `test/coco-contract.test.mjs` - coco's own storage adapter contract suites, run against `lib/coco-store.mjs`
 - `test/coco-store.test.mjs` - serialization, rollback and locking in `lib/coco-store.mjs`
+- `test/art.test.mjs` - the wordmark's geometry, the colour-depth check, and that a
+  gradient still measures as the characters under it
 - `test/melt-fee.test.mjs` - the input-fee floor `cashme withdraw` refuses below
 - `test/mint-url.test.mjs` - mint url normalization and validation
 - `test/nostr.test.mjs` - npub decoding and NIP-01 event ids and signatures

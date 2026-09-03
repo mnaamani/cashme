@@ -1,10 +1,32 @@
-# CASHME .... if you can
+<p align="center">
+  <img src="docs/media/cli-banner.svg" alt="CASHME — a cashu wallet in your terminal" width="760">
+</p>
 
-> A cashu wallet in your terminal, send and receive ecash over Bluetooth.
+<p align="center">
+  <a href="https://github.com/mnaamani/cashme/actions/workflows/ci.yaml"><img alt="build" src="https://img.shields.io/github/actions/workflow/status/mnaamani/cashme/ci.yaml?branch=main&style=flat-square&label=integrate&labelColor=0b0e16&color=22f0ff"></a>
+  <img alt="licence" src="https://img.shields.io/badge/licence-Apache--2.0-ff2bd6?style=flat-square&labelColor=0b0e16">
+  <img alt="runtime" src="https://img.shields.io/badge/runtime-bare-9b6cff?style=flat-square&labelColor=0b0e16">
+  <img alt="platforms" src="https://img.shields.io/badge/platforms-macos%20%7C%20linux%20%7C%20windows-3ff59b?style=flat-square&labelColor=0b0e16">
+</p>
 
-## EXPERIMENTAL - Use at your own risk !
+<p align="center">
+  <b>Bearer ecash, handed from one device to another over the radio.</b><br>
+  No account, no server in the middle, no permission asked.
+</p>
 
-cashme is made for educational, research and testing purposes only.
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#the-wallet-on-one-screen">The UI</a> ·
+  <a href="#or-one-command-at-a-time">Commands</a> ·
+  <a href="#docs">Docs</a>
+</p>
+
+> ### ⚠ EXPERIMENTAL — use at your own risk
+>
+> cashme is made for educational, research and testing purposes only. Every mint is
+> custodial, ecash is bearer money, and this is a young wallet. Keep balances small.
+
+---
 
 ## Install
 
@@ -37,15 +59,45 @@ cashme            # the whole wallet on one screen
 cashme --help     # or the list of commands, if you would rather type them
 ```
 
-Run on its own, `cashme` opens a full-screen terminal UI: balances, sends still in flight,
-and the deposit, give, get and withdraw flows, on one screen. Piped or run from a
-script it prints the help instead, since there is no terminal to paint on.
-
 The wallet keeps itself up to date in the background from its own pear link, so it never
 needs reinstalling to move to a newer version. See [docs/installing.md](docs/installing.md)
 for what each route does, pinning a version, and uninstalling.
 
-## What it does
+---
+
+## The wallet on one screen
+
+Run on its own, `cashme` opens a full-screen terminal UI. Balances, sends still in flight,
+and the deposit, give, get and withdraw flows, all in one place, updating as they happen.
+Piped or run from a script it prints the help instead, since there is no terminal to paint on.
+
+<p align="center">
+  <img src="docs/media/tui-splash.svg" alt="the cashme wordmark glitching in on start-up" width="720">
+</p>
+
+<p align="center">
+  <img src="docs/media/tui-menu.svg" alt="the cashme main menu: balance, and the ten things it can do" width="820">
+</p>
+
+Every action is a row on that list. Two of them:
+
+<table>
+<tr>
+<td width="50%"><img src="docs/media/tui-mints.svg" alt="the mints screen: who this wallet trusts and what each holds"></td>
+<td width="50%"><img src="docs/media/tui-give.svg" alt="the give screen: four ways to hand ecash over"></td>
+</tr>
+<tr>
+<td align="center"><sub><b>mints</b> — who this wallet trusts, what each holds, and in which denominations</sub></td>
+<td align="center"><sub><b>give</b> — hand it over by bluetooth, wi-fi, the hyperdht, or as text</sub></td>
+</tr>
+</table>
+
+> Every image above is generated from the UI itself by `npm run screenshots` — they are
+> painted frames, not photographs, so they cannot quietly go out of date.
+
+---
+
+## Or one command at a time
 
 ecash tokens are exchanged directly between two devices over Bluetooth Low Energy (BLE),
 the local network or the hyperdht, with no server in between — or handed over as text or a
@@ -72,6 +124,8 @@ everything http-shaped through a SOCKS5 or an HTTP proxy of your choosing.
 Run `cashme <command> --help` for any command.
 
 Every command in full is in [docs/usage/](docs/usage/).
+
+---
 
 ## Docs
 

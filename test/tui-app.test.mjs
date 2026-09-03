@@ -219,10 +219,10 @@ const ACTIONS = [
 
 // Mounts the app and returns the handles a test drives it with. `flush` waits for the
 // renders an action sets off — state set in an effect paints on a later turn, not this one.
-function mount(api, { columns = 80, rows = 30, ephemeral = false } = {}) {
+function mount(api, { columns = 80, rows = 30, ephemeral = false, splash = false } = {}) {
   const stdout = new FakeStdout({ columns, rows })
   const stdin = new FakeStdin()
-  const app = render(h(App, { api, version: 'v0', ephemeral }), { stdout, stdin })
+  const app = render(h(App, { api, version: 'v0', ephemeral, splash }), { stdout, stdin })
   const flush = async (turns = 4) => {
     for (let i = 0; i < turns; i++) await settled()
   }
@@ -2017,4 +2017,42 @@ test('the frame stops one cell short of the terminal in both directions', async 
 
     ui.app.unmount()
   }
+})
+
+test('the wallet introduces itself before it opens, and gets out of the way when told', async (t) => {
+  const ui = mount(fakeApi(), { splash: true })
+  await ui.flush()
+
+  t.ok(ui.screen().includes('if you can'), 'the wordmark is what the session starts on')
+  t.absent(ui.screen().includes('nutzap'), 'and it is the whole screen, not a header over the menu')
+
+  // Any key at all, and the key does not also reach the root's handler — a press that both
+  // skipped the animation and quit the session would make the animation unskippable.
+  await ui.type('q')
+  t.ok(ui.screen().includes('8000 sat'), 'a keystroke goes straight to the wallet')
+  t.ok(ui.screen().includes('nutzap'), 'with the actions under it')
+
+  await ui.type('q')
+  t.ok(await ui.app.waitUntilExit().then(() => true), 'and q still quits once it is open')
+})
+
+test('the menu wears the wordmark only on a terminal with rows to spare', async (t) => {
+  const tall = mount(fakeApi(), { columns: 92, rows: 40 })
+  await tall.flush()
+  t.ok(tall.screen().includes('no servers, no permission'), 'a tall terminal gets the crest')
+  for (const action of ACTIONS) {
+    t.ok(tall.screen().includes(action), `${action} is still on the list under it`)
+  }
+  tall.app.unmount()
+
+  // The decoration is the first thing to go, and the list of what the wallet can do is the
+  // last: the crest costs rows, and an action pushed off the bottom is an action nobody can
+  // reach.
+  const short = mount(fakeApi(), { columns: 92, rows: 24 })
+  await short.flush()
+  t.absent(short.screen().includes('no servers, no permission'), 'a short one does not')
+  for (const action of ACTIONS) {
+    t.ok(short.screen().includes(action), `${action} survives on a short terminal`)
+  }
+  short.app.unmount()
 })
