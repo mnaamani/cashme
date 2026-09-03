@@ -1,5 +1,5 @@
 import test from 'brittle'
-import { tokenQueue } from '../lib/token-wire.mjs'
+import { MAX_TOKEN_BYTES, assertTokenSize, tokenQueue } from '../lib/token-wire.mjs'
 
 test('a failed token receipt is rejected without poisoning the next receipt', async (t) => {
   const received = []
@@ -13,4 +13,21 @@ test('a failed token receipt is rejected without poisoning the next receipt', as
   await queue.drained()
 
   t.alike(received, ['accepted'], 'the next sender can still receive a durable receipt')
+})
+
+test('token input and pending receipts have finite limits', async (t) => {
+  t.exception(() => assertTokenSize('x'.repeat(MAX_TOKEN_BYTES + 1)), /maximum/)
+
+  let release
+  const waiting = new Promise((resolve) => {
+    release = resolve
+  })
+  const queue = tokenQueue(() => waiting, { maxPending: 1 })
+
+  const first = queue.enqueue('first')
+  t.absent(queue.canReceive(), 'the one available receipt slot is occupied')
+  await t.exception(queue.enqueue('second'), /too many incoming tokens/)
+  release()
+  await first
+  t.ok(queue.canReceive(), 'settling a receipt frees its slot')
 })
