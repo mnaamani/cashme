@@ -156,6 +156,7 @@ function fakeApi(overrides = {}) {
       address = next
       return address
     },
+    proxy: () => ({ name: 'socks5://127.0.0.1:1080', source: 'ALL_PROXY' }),
     settings: () => ({
       binary: '/tmp/bare',
       storage: '/tmp/wallet',
@@ -1198,6 +1199,10 @@ test('settings shows where this session runs and what it wears', async (t) => {
   await ui.flush()
 
   t.ok(ui.screen().includes('ephemeral'), 'the address mode is in the top bar from the start')
+  t.ok(
+    ui.screen().includes('via socks5://127.0.0.1:1080'),
+    'and so is the proxy the traffic goes through'
+  )
 
   await ui.pick('settings')
   const screen = ui.screen()
@@ -1208,6 +1213,15 @@ test('settings shows where this session runs and what it wears', async (t) => {
   t.ok(screen.includes('socks5://127.0.0.1:1080'), 'the proxy in force')
   t.ok(screen.includes('from ALL_PROXY'), 'and where it came from')
   t.ok(screen.includes('en0'), 'the interface the hyperdht is pinned to')
+
+  ui.app.unmount()
+})
+
+test('with no proxy the top bar says nothing about one', async (t) => {
+  const ui = mount(fakeApi({ proxy: () => null }), { columns: 100 })
+  await ui.flush()
+
+  t.absent(ui.screen().includes('via '), 'nothing is claimed about a wire that is direct')
 
   ui.app.unmount()
 })
