@@ -934,11 +934,10 @@ test('c is the copy key only where it cannot be a character being typed', async 
   ui.app.unmount()
 })
 
-test('a token refused over a wire is kept, since the sender has already let go of it', async (t) => {
-  // The wire acknowledges a token the moment it parses — before the mint question is even
-  // put — so by the time it is refused the sender has finalized its send and this string is
-  // the only copy of the money left. Losing it would make declining a mint cost the user
-  // the ecash rather than the mint.
+test('a token refused over a wire is not acknowledged, and the listener keeps going', async (t) => {
+  // The wire acknowledges only after the wallet has stored the token. Refusing this mint
+  // rejects that receipt, so the sender retains or reclaims its proofs instead of treating
+  // the token string in this process as the only copy of the money.
   const { tokenQueue } = await import('../lib/token-wire.mjs')
   const arrived = 'cashuBfromastranger'
   const api = fakeApi({
@@ -947,7 +946,10 @@ test('a token refused over a wire is kept, since the sender has already let go o
       // The real wires hand tokens over through this queue, and it is the queue that
       // decides what a throwing handler means.
       const queue = tokenQueue(ontoken)
-      return queue.enqueue(arrived).then(() => cancelled)
+      return queue
+        .enqueue(arrived)
+        .catch(() => {})
+        .then(() => cancelled)
     }
   })
   const ui = mount(api)
@@ -970,7 +972,7 @@ test('a token refused over a wire is kept, since the sender has already let go o
     api.calls.some(([name]) => name === 'trust'),
     'and trusts nothing'
   )
-  t.ok(ui.screen().includes(arrived), 'but the token itself is in the log to be claimed later')
+  t.ok(/refused: declined/.test(ui.screen()), 'and says the sender was not acknowledged')
 
   ui.app.unmount()
 })
