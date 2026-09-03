@@ -4,8 +4,10 @@ HTTP CONNECT proxy agents for [Bare](https://github.com/holepunchto/bare) — fo
 `bare-ws`, and anything else that takes a `bare-http1` agent.
 
 Named for what Node's `https-proxy-agent` does: ask an http proxy for a tunnel and speak to
-the target through it. Both `http:` and `https:` targets go through the same tunnel here, so
-this one package covers what Node splits over two.
+the target through it. Both `http:` and `https:` targets can go through the tunnel, which is
+why there is an agent for each. For `http:` targets through a proxy that forwards rather than
+tunnels — Node's `http-proxy-agent` — see
+[`bare-http-proxy-agent`](../bare-http-proxy-agent).
 
 ## Usage
 
@@ -42,9 +44,9 @@ method needs — no user agent, no cookies.
 
 #### `createAgents(proxy[, opts])`
 
-`{ http, https }` — an agent for `http:` targets and one for `https:` ones. `proxy` is a url
-string or the result of `parse()`; `opts` goes to `bare-http1`'s `Agent`. Keep-alive is on by
-default, so a tunnel is reused rather than rebuilt per request.
+`{ http, https }` — an agent for `http:` targets and one for `https:` ones, both tunnelling.
+`proxy` is a url string or the result of `parse()`; `opts` goes to `bare-http1`'s `Agent`.
+Keep-alive is on by default, so a tunnel is reused rather than rebuilt per request.
 
 #### `new HttpsProxyHTTPAgent(proxy[, opts])` · `new HttpsProxyHTTPSAgent(proxy[, opts])`
 
@@ -88,12 +90,13 @@ agents is the one real ergonomic difference — bare-http1 hands an agent no way
 `https:` target from an `http:` one, so which one a request needs is the caller's to pick.
 `createAgents()` returns both for exactly that reason.
 
-Node splits CONNECT over two packages: `https-proxy-agent` tunnels, while `http-proxy-agent`
-sends `http:` requests to the proxy as an absolute URI (`GET http://host/path`) rather than
-tunnelling them. This package tunnels both, so `agents.http` behaves like `https-proxy-agent`
-pointed at an `http:` target, not like `http-proxy-agent`. Most proxies take that; one
-configured to allow `CONNECT` only to port 443 — a common Squid default — will refuse a
-tunnel to port 80 that Node's `http-proxy-agent` would have got through.
+Node uses an http proxy two ways, and so do we: `https-proxy-agent` tunnels, while
+`http-proxy-agent` sends `http:` requests to the proxy as an absolute URI
+(`GET http://host/path`) rather than tunnelling them. The split is the same here —
+`bare-http-proxy-agent` is the forwarding half. `agents.http` tunnels, so it behaves like
+`https-proxy-agent` pointed at an `http:` target: most proxies take that, but one configured
+to allow `CONNECT` only to port 443 — a common Squid default — will refuse a tunnel to port
+80 that a forwarded request would have got through.
 
 `opts.headers` and `agent.proxyHeaders` match `https-proxy-agent`, function form included.
 `onProxyAuth` and `negotiate` (NTLM/Kerberos negotiation) have no equivalent here.

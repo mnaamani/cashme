@@ -71,16 +71,36 @@ npm start -- --no-updates
 
 ## Packages
 
-The proxy support lives in three packages of its own under `packages/`, because none of it
-is about ecash and Bare had no proxy agent of any kind. They are workspaces of this repo for
-now, and are meant to be extracted into their own repositories once they have settled:
+The proxy support lives in six packages of its own under `packages/`, because none of it is
+about ecash and Bare had no proxy agent of any kind. They are workspaces of this repo for
+now, and are meant to be extracted into their own repositories once they have settled.
+
+The wallet imports the top two and nothing below them:
+
+- `packages/bare-any-proxy-agent` - one entry point for every scheme: hand it a proxy url of
+  any of them and get back the agents to use it with (Node's `proxy-agent`)
+- `packages/bare-proxy-from-env` - which proxy the environment is asking for: `http_proxy`,
+  `https_proxy`, `ALL_PROXY`, `no_proxy`, read the way curl reads them, with no sockets or
+  agents involved (Node's `proxy-from-env`)
+
+Under those:
 
 - `packages/bare-proxy-agent` - the half every proxy protocol shares: a socket opened by
   handshake rather than by connecting, the bare-http1 agents built on it, and the reading
   and error types a handshake is written against
 - `packages/bare-socks-proxy-agent` - SOCKS5 (RFC 1928, and RFC 1929 for credentials), with
   the target name resolved by the proxy
+- `packages/bare-http-proxy-agent` - an http proxy asked to forward, with the whole url in
+  the request line, for `http:` targets
 - `packages/bare-https-proxy-agent` - HTTP CONNECT, over a plain or a TLS first hop
+
+The last two are the same split Node makes between `http-proxy-agent` and
+`https-proxy-agent`, and `bare-any-proxy-agent` picks between them the same way: an `http:`
+target is forwarded, an `https:` one is tunnelled.
+
+What is left in `lib/net.mjs` is the wallet's own policy rather than the convention: that
+`--proxy` and `CASHME_PROXY` outrank the environment and are exempt from `no_proxy`, the
+global `fetch` wrapper, the per-request timeout, and `--dht-interface`.
 
 Nothing in the Node ecosystem could be used instead: `socks-proxy-agent` and friends are
 built on `agent-base` and Node's `net`/`tls`/`http`, none of which Bare has, and bare-http1's

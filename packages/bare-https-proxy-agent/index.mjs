@@ -1,7 +1,14 @@
 // HTTP CONNECT (RFC 9110 §9.3.6) for Bare, as http agents bare-fetch and bare-ws can be
 // handed. Named for what Node's https-proxy-agent does: ask an http proxy for a tunnel and
-// speak to the target through it. Both http:// and https:// targets go through the same
-// tunnel here, so this one package covers what Node splits over two.
+// speak to the target through it.
+//
+// Both http:// and https:// targets can go through the tunnel, which is why there are two
+// agents here — Node's HttpsProxyAgent covers both in one class by reading the endpoint's
+// protocol off `opts.secureEndpoint`, and bare-http1 tells an agent no such thing. What a
+// tunnel to an http:// target is *for* is the other package's business: bare-http-proxy-agent
+// forwards those instead, which is what Node's http-proxy-agent does and what a proxy that
+// only allows CONNECT to port 443 will accept. Use this pair's http agent when the tunnel is
+// wanted for an http:// target specifically.
 //
 // An `https://` proxy url means the first hop is itself TLS — the request head below,
 // including any Proxy-Authorization, is then encrypted to the proxy rather than sent in the

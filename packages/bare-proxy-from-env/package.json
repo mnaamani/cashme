@@ -1,0 +1,43 @@
+{
+  "name": "bare-proxy-from-env",
+  "version": "0.1.0",
+  "description": "Read the proxy the environment asks for — http_proxy, https_proxy, ALL_PROXY and no_proxy — under Bare",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./package": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "lib",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "brittle-bare test/index.mjs"
+  },
+  "dependencies": {
+    "bare-process": "^4.5.0"
+  },
+  "devDependencies": {
+    "brittle": "^3.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mnaamani/cashme.git",
+    "directory": "packages/bare-proxy-from-env"
+  },
+  "author": "Mokhtar Naamani",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/mnaamani/cashme/issues"
+  },
+  "keywords": [
+    "bare",
+    "proxy",
+    "environment",
+    "http_proxy",
+    "no_proxy"
+  ]
+}

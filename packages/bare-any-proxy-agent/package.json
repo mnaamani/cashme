@@ -1,0 +1,47 @@
+{
+  "name": "bare-any-proxy-agent",
+  "version": "0.1.0",
+  "description": "One entry point for every proxy scheme Bare speaks — socks5, socks5h, http, https — picking the agent a proxy url calls for",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./package": "./package.json"
+  },
+  "files": [
+    "index.mjs",
+    "lib",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "brittle-bare test/index.mjs"
+  },
+  "dependencies": {
+    "bare-http-proxy-agent": "^0.1.0",
+    "bare-https-proxy-agent": "^0.1.0",
+    "bare-proxy-agent": "^0.1.0",
+    "bare-socks-proxy-agent": "^0.1.0"
+  },
+  "devDependencies": {
+    "brittle": "^3.19.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mnaamani/cashme.git",
+    "directory": "packages/bare-any-proxy-agent"
+  },
+  "author": "Mokhtar Naamani",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/mnaamani/cashme/issues"
+  },
+  "keywords": [
+    "bare",
+    "proxy",
+    "agent",
+    "socks5",
+    "http",
+    "https"
+  ]
+}

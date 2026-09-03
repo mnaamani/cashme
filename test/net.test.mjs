@@ -1,14 +1,17 @@
 // The policy a run is under: which agent a request gets, what each flag refuses to
 // half-apply, and that a proxy failure reaches the user in words they can act on.
 //
-// The proxy protocols themselves are tested where they live — packages/bare-socks-proxy-agent
-// and packages/bare-https-proxy-agent. What is tested here is the wiring: that configuring a
-// proxy actually moves this wallet's traffic, global fetch and all.
+// The proxy protocols themselves are tested where they live — packages/bare-socks-proxy-agent,
+// packages/bare-http-proxy-agent and packages/bare-https-proxy-agent. What is tested here is
+// the wiring: that configuring a proxy actually moves this wallet's traffic, global fetch and
+// all.
 import '../lib/polyfills.mjs'
 import test from 'brittle'
 import tcp from 'bare-tcp'
 import http from 'bare-http1'
 import { proxyErrorIn } from 'bare-proxy-agent'
+import { HttpProxyAgent } from 'bare-http-proxy-agent'
+import { HttpsProxyHTTPSAgent } from 'bare-https-proxy-agent'
 import process from 'bare-process'
 import { isWindows } from 'which-runtime'
 import os from 'bare-os'
@@ -130,6 +133,20 @@ test('every scheme we claim to speak picks an agent, and nothing else is accepte
     /unsupported proxy scheme/
   )
   t.exception.all(() => configureNetwork({ proxy: 'not a url' }), /not a proxy url/)
+})
+
+// An http proxy does two different jobs, and which one a request gets is decided here rather
+// than by the proxy: a target the proxy can read is forwarded to it, and one it cannot is
+// asked for as a tunnel. Node splits these over http-proxy-agent and https-proxy-agent, and
+// so do we.
+test('an http proxy forwards http targets and tunnels https ones', (t) => {
+  t.teardown(clearNetwork)
+  configureNetwork({ proxy: 'http://127.0.0.1:3128' })
+
+  t.ok(agentFor('http://mint.example') instanceof HttpProxyAgent, 'http: is forwarded')
+  t.ok(agentFor('https://mint.example') instanceof HttpsProxyHTTPSAgent, 'https: is tunnelled')
+  t.is(agentFor('ws://relay.example'), agentFor('http://mint.example'), 'ws: is http')
+  t.is(agentFor('wss://relay.example'), agentFor('https://mint.example'), 'wss: is https')
 })
 
 test('--proxy picks the agent, and leaves the wires it was never going to carry alone', (t) => {

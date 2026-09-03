@@ -9,7 +9,9 @@ on it, and the reading and error types a handshake is written against.
 **Start with one of these instead**, unless you are teaching this package a protocol of your
 own:
 
+- [`bare-any-proxy-agent`](../bare-any-proxy-agent) — any of the below, picked from the url
 - [`bare-socks-proxy-agent`](../bare-socks-proxy-agent) — SOCKS5
+- [`bare-http-proxy-agent`](../bare-http-proxy-agent) — an http proxy asked to forward
 - [`bare-https-proxy-agent`](../bare-https-proxy-agent) — HTTP CONNECT
 
 ## Usage
