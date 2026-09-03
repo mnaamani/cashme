@@ -8,7 +8,7 @@ SOCKS5 proxy agents for [Bare](https://github.com/holepunchto/bare) — for `bar
 ```js
 import { createAgents } from 'bare-socks-proxy-agent'
 
-const agents = createAgents('socks5://127.0.0.1:9050')
+const agents = createAgents('socks5://127.0.0.1:1080')
 
 const response = await fetch('https://example.com', { agent: agents.https })
 const socket = new Socket('wss://relay.example', { agent: agents.https }) // bare-ws
@@ -50,7 +50,11 @@ The two agents on their own, for when only one is wanted.
 #### `parse(url)`
 
 `{ protocol, host, port, username, password, secure }` for a `socks5://` or `socks5h://` url.
-Host and port only — a path or a query is refused rather than guessed at.
+Host and port only — a path or a query is refused rather than guessed at, and so is a
+missing port. `socks-proxy-agent` and curl both read a port-less proxy url as 1080, but
+plenty of SOCKS proxies listen somewhere else, and a guess that lands on the wrong service is
+handed the SOCKS5 handshake with the username and password in it before anything notices. The
+port is one word that only the person configuring it knows.
 
 #### `handshake({ socket, reader, proxy, target })`
 

@@ -20,10 +20,15 @@ test('an http proxy url is read, and an https one says the first hop is TLS', (t
     password: '',
     secure: false
   })
-  t.is(parse('https://proxy.example').secure, true, 'the proxy itself is reached over TLS')
-  t.is(parse('http://proxy.example').port, 8080)
-  t.is(parse('https://proxy.example').port, 443)
-  t.exception.all(() => parse('socks5://127.0.0.1:9050'), /unsupported proxy scheme/)
+  t.is(parse('https://proxy.example:443').secure, true, 'the proxy itself is reached over TLS')
+  t.is(parse('https://proxy.example:443').port, 443, 'a default port written down is kept')
+  t.is(parse('http://proxy.example:80').port, 80)
+  t.exception.all(
+    () => parse('http://proxy.example'),
+    /names no port/,
+    'a port is written down, never guessed at — 80, 443, 1080 and 8080 all have a claim'
+  )
+  t.exception.all(() => parse('socks5://127.0.0.1:1080'), /unsupported proxy scheme/)
 })
 
 test('an agent says what it speaks and what it was configured with', (t) => {
@@ -94,6 +99,47 @@ test('a port that is listening but answers no http is reported as one', async (t
   const port = await listener(t, (socket) => socket.write('SSH-2.0-OpenSSH_9.8\r\n\r\n'))
   const err = await failure(t, port)
   t.ok(/answered a CONNECT with something that is not HTTP/.test(err.message), err.message)
+})
+
+// The CONNECT head is built by hand rather than by bare-http1, so nothing upstream has
+// checked it for the characters that end a line early. A value carrying CR or LF could add a
+// second CONNECT, to somewhere else entirely.
+test('a header value that would end the line early is refused', async (t) => {
+  const proxy = await connectProxy(t)
+  const agents = createAgents(`http://127.0.0.1:${proxy.port}`, {
+    headers: { 'X-Probe': 'one\r\nCONNECT evil.example:443 HTTP/1.1\r\nHost: evil.example:443' }
+  })
+  t.teardown(() => {
+    agents.http.destroy()
+    agents.https.destroy()
+  })
+
+  const err = await fetch('http://mint.example/', { agent: agents.http }).then(
+    () => null,
+    (err) => proxyErrorIn(err) ?? err
+  )
+
+  t.is(err?.code, 'PROXY_ERROR')
+  t.ok(/cannot carry a newline/.test(err.message), err.message)
+  t.alike(proxy.asked, [], 'and no CONNECT was sent at all')
+})
+
+// The tunnel would be built to the right place and then spoken through in the clear, since
+// this agent negotiates no TLS. Port 443 means an https: target reached the wrong agent,
+// which is what a redirect through bare-fetch does.
+test('a plain http tunnel to port 443 is refused, not downgraded', async (t) => {
+  const proxy = await connectProxy(t)
+
+  const err = await fetch('https://secret.example/vault', {
+    agent: agentsFor(t, proxy.port).http
+  }).then(
+    () => null,
+    (err) => proxyErrorIn(err) ?? err
+  )
+
+  t.is(err?.code, 'PROXY_ERROR')
+  t.ok(/port 443/.test(err.message), err.message)
+  t.alike(proxy.asked, [], 'and no tunnel was asked for')
 })
 
 // The reason a request failed. bare-fetch answers every failure with `NETWORK_ERROR` and

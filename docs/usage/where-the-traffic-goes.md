@@ -6,26 +6,29 @@ address the packets leave from: a mint sees where its user is, and so does a rel
 lnurl host and a NIP-05 domain. `--proxy` is how to change that.
 
 ```sh
-cashme --proxy socks5://127.0.0.1:9050 balance
+cashme --proxy socks5://127.0.0.1:1080 balance
 cashme --proxy socks5h://127.0.0.1:1080 deposit -a 100  # the same thing, spelled the other way
-cashme --proxy http://proxy.lan:3128 restore            # a CONNECT proxy
+cashme --proxy http://proxy.lan:3128 restore            # an http proxy
 cashme --proxy socks5://user:pass@127.0.0.1:1080 zap -p npub1... -s 21
-export CASHME_PROXY=socks5://127.0.0.1:9050             # or set it once for every run
+export CASHME_PROXY=socks5://127.0.0.1:1080             # or set it once for every run
 ```
 
 Failing both of those, the environment is read the way curl reads it, so a machine already
 set up for a proxy needs nothing said here:
 
 ```sh
-export https_proxy=socks5://127.0.0.1:9050   # https, wss, and anything ALL_PROXY would cover
+export https_proxy=socks5://127.0.0.1:1080   # https, wss, and anything ALL_PROXY would cover
 export http_proxy=http://proxy.lan:3128      # http and ws
-export ALL_PROXY=socks5://127.0.0.1:9050     # both, when neither of the above is set
+export ALL_PROXY=socks5://127.0.0.1:1080     # both, when neither of the above is set
 export no_proxy=localhost,127.0.0.1,.lan     # hosts to reach directly anyway
 ```
 
 The convention in full: the lower case spelling wins where both are set, `ALL_PROXY` is the
 fallback for a scheme with no proxy of its own, and a value may be written `host:port` with
-no scheme, which means `http://`. `http_proxy` is read in **lower case only** — under CGI a
+no scheme, which means `http://`. The port is never left out — a proxy url with no port is
+refused rather than given one, since 80, 443, 1080 and 8080 all have a claim to being the
+default and a guess that lands on the wrong service is handed your proxy password before
+anything notices. `http_proxy` is read in **lower case only** — under CGI a
 request header `Proxy:` arrives as `HTTP_PROXY` in the environment, so honouring the upper
 case spelling would let whoever sent the request choose the proxy. `no_proxy` is a
 comma-separated list where `*` alone means every host, an entry matches the hostname or any
@@ -46,9 +49,16 @@ Every http and https request and every relay websocket then goes through the pro
 requests (coco's included), lightning address lookups, NIP-05 lookups, nostr relays.
 Hostnames are handed to the proxy as written and resolved there, so no DNS query for a mint
 leaves this machine either — what `socks5h://` means elsewhere, and what both socks schemes
-do here. TLS is still end to end: the proxy carries the ciphertext and reads no more of it
-than any other hop. `socks5://`, `socks5h://`, `http://` and `https://` proxies are
-supported, with a username and password in the url when the proxy wants one.
+do here. `socks5://`, `socks5h://`, `http://` and `https://` proxies are supported, with a
+username and password in the url when the proxy wants one.
+
+For an `https:` destination — which is every mint, relay and lnurl host worth using — TLS is
+end to end: the proxy is asked for a tunnel and carries the ciphertext, reading no more of it
+than any other hop. An `http:` destination has no such protection to keep, so an http proxy
+is asked to fetch it and reads the whole request, as it would for any other client. A
+destination that redirects from `http:` to `https:` is refused rather than followed: the
+connection was opened for the scheme first asked for, and answering the second over it would
+mean fetching in the clear what the redirect asked to be kept private.
 
 `--dht-interface` sends the hyperdht out from one local address, named either by interface
 or by the address itself:

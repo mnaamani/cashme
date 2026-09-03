@@ -20,17 +20,19 @@
 import {
   ProxyError,
   ProxyHTTPAgent,
+  hasCredentials,
   parseProxyUrl,
-  proxyErrorIn,
-  hasCredentials
+  proxyErrorIn
 } from 'bare-proxy-agent'
 
-// Where an http proxy listens when the url names no port. The same table
-// bare-https-proxy-agent has: it is the proxy url being read, not the target's.
-export const PORTS = { 'http:': 8080, 'https:': 443 }
+// The schemes a proxy url may be written with. It is the proxy url being read here, not
+// the target's, so an https:// one is a proxy reached over TLS. No default port goes with
+// them: a port-less proxy url is refused rather than read as 80 or 443, which is what
+// http-proxy-agent reads it as — see parseProxyUrl.
+export const SCHEMES = ['http:', 'https:']
 
 export function parse(url) {
-  const proxy = parseProxyUrl(url, PORTS)
+  const proxy = parseProxyUrl(url, SCHEMES)
   // The one thing the base cannot work out for itself: whether to reach the proxy over TLS.
   proxy.secure = proxy.protocol === 'https:'
   return proxy
@@ -39,11 +41,14 @@ export function parse(url) {
 // There is no handshake to speak here — the connection to the proxy is the connection, and
 // the request itself is what says where it is going. ProxySocket takes one anyway, and this
 // is it: what it buys is TLS to the proxy for an https:// proxy url, and the socket calls
-// bare-http1 makes on a connection that is still opening.
+// bare-http1 makes on a connection that is still opening. ProxyHTTPAgent wraps it with the
+// one refusal every plaintext proxy agent shares — an https: target that reached the agent
+// built for http: — so there is nothing left for this one to do.
 //
 // It also means the handshake timeout has nothing to time out. That is right rather than
 // missing: a forwarding proxy says nothing until it has answered the request, so a proxy
 // that is listening and not answering is the request's own timeout to report, not ours.
+//
 // Nothing to await: ProxySocket awaits whatever this returns, and there is nothing to wait
 // for.
 function connected() {}
@@ -85,17 +90,17 @@ export class HttpProxyAgent extends ProxyHTTPAgent {
 
     const agent = this
     const inherited = req._header
+    let rewritten = false
 
     req._header = function () {
-      // Guarded the way http-proxy-agent guards its own second call: a path that is already
-      // absolute has been through here.
-      if (!this._path.includes('://')) {
-        // The Host header, as http-proxy-agent does, so a caller that set one of its own is
-        // the one deciding what the proxy is asked for.
-        const host = this.getHeader('host') || 'localhost'
-        const url = new URL(this._path, `http://${host}`)
-        if (opts.port && Number(opts.port) !== 80) url.port = String(opts.port)
-        this._path = url.href
+      // A flag rather than http-proxy-agent's test for `://` in the path. That test asks
+      // whether the path is already absolute, and answers yes for any path that merely
+      // contains a url — `/callback?to=https://example.com`, which is what half of lnurl
+      // looks like. The request then goes to the proxy in origin-form, with no
+      // Proxy-Authorization on it, and the proxy reads it as a request for itself.
+      if (!rewritten) {
+        rewritten = true
+        this._path = absolute(this, opts)
 
         for (const [name, value] of Object.entries(agent._headersFor())) {
           if (value === undefined || value === null || value === '') continue
@@ -126,6 +131,22 @@ export class HttpProxyAgent extends ProxyHTTPAgent {
     }
     return headers
   }
+}
+
+// The request line a forwarding proxy is given: the target's origin, then the path exactly
+// as it stands.
+//
+// The origin comes from the Host header, as http-proxy-agent does, so a caller that set one
+// of its own is the one deciding what the proxy is asked for. The path is appended rather
+// than resolved against it: `new URL(path, origin)`, which is what http-proxy-agent does,
+// reads a path beginning with `//` as an authority, so `http://mint.example//v1/info` would
+// be forwarded as a request to a host called `v1`. bare-http1 has already refused a path
+// carrying whitespace or a control character, which is what the request line needs of it.
+function absolute(req, opts) {
+  const authority = new URL(`http://${req.getHeader('host') || 'localhost'}`)
+  if (opts.port && Number(opts.port) !== 80) authority.port = String(opts.port)
+  const path = req._path.startsWith('/') ? req._path : `/${req._path}`
+  return `http://${authority.host}${path}`
 }
 
 // Set a header without leaving a differently-cased one beside it — `_header()` lowercases

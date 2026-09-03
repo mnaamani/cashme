@@ -17,10 +17,10 @@ import {
   proxyName
 } from '../index.mjs'
 
-const PORTS = { 'demo:': 9000 }
+const SCHEMES = ['demo:']
 
 test('a proxy url is read into a host, a port and credentials', (t) => {
-  t.alike(parseProxyUrl('demo://127.0.0.1:1080', PORTS), {
+  t.alike(parseProxyUrl('demo://127.0.0.1:1080', SCHEMES), {
     protocol: 'demo:',
     host: '127.0.0.1',
     port: 1080,
@@ -28,24 +28,28 @@ test('a proxy url is read into a host, a port and credentials', (t) => {
     password: '',
     secure: false
   })
-  t.is(parseProxyUrl('demo://127.0.0.1', PORTS).port, 9000, 'the scheme default when none is given')
-  t.is(parseProxyUrl('demo://[::1]:1080', PORTS).host, '::1', 'an ipv6 host loses its brackets')
+  t.exception.all(
+    () => parseProxyUrl('demo://127.0.0.1', SCHEMES),
+    /names no port/,
+    'a port is written down, never guessed'
+  )
+  t.is(parseProxyUrl('demo://[::1]:1080', SCHEMES).host, '::1', 'an ipv6 host loses its brackets')
 
-  const withCredentials = parseProxyUrl('demo://me:s3%3Acret@127.0.0.1:1080', PORTS)
+  const withCredentials = parseProxyUrl('demo://me:s3%3Acret@127.0.0.1:1080', SCHEMES)
   t.alike([withCredentials.username, withCredentials.password], ['me', 's3:cret'])
   t.ok(hasCredentials(withCredentials))
-  t.absent(hasCredentials(parseProxyUrl('demo://127.0.0.1:1080', PORTS)))
+  t.absent(hasCredentials(parseProxyUrl('demo://127.0.0.1:1080', SCHEMES)))
 })
 
 test('anything that is not a proxy address is refused', (t) => {
-  t.exception.all(() => parseProxyUrl('not a url', PORTS), /not a proxy url/)
-  t.exception.all(() => parseProxyUrl('ftp://127.0.0.1:21', PORTS), /unsupported proxy scheme/)
-  t.exception.all(() => parseProxyUrl('demo://127.0.0.1:1/path', PORTS), /host and a port only/)
-  t.exception.all(() => parseProxyUrl('demo://127.0.0.1:1?x=1', PORTS), /host and a port only/)
+  t.exception.all(() => parseProxyUrl('not a url', SCHEMES), /not a proxy url/)
+  t.exception.all(() => parseProxyUrl('ftp://127.0.0.1:21', SCHEMES), /unsupported proxy scheme/)
+  t.exception.all(() => parseProxyUrl('demo://127.0.0.1:1/path', SCHEMES), /host and a port only/)
+  t.exception.all(() => parseProxyUrl('demo://127.0.0.1:1?x=1', SCHEMES), /host and a port only/)
 })
 
 test('a proxy is named by the address it was configured with, never its password', (t) => {
-  const proxy = parseProxyUrl('demo://me:s3cret@[::1]:1080', PORTS)
+  const proxy = parseProxyUrl('demo://me:s3cret@[::1]:1080', SCHEMES)
   t.is(proxyName(proxy), 'demo://[::1]:1080')
   t.is(authority({ host: 'mint.example', port: 443 }), 'mint.example:443')
   t.is(authority({ host: '::1', port: 443 }), '[::1]:443', 'an ipv6 host goes back in brackets')
@@ -60,7 +64,7 @@ test('a proxy error is found again however deeply it has been wrapped', (t) => {
 })
 
 test('an agent carries the proxy it was built with, and what it speaks', (t) => {
-  const proxy = parseProxyUrl('demo://me:s3cret@127.0.0.1:1080', PORTS)
+  const proxy = parseProxyUrl('demo://me:s3cret@127.0.0.1:1080', SCHEMES)
   const agent = new ProxyHTTPAgent({ proxy, handshake }, { handshakeTimeout: 200 })
   t.teardown(() => agent.destroy())
 
@@ -82,12 +86,41 @@ test('a request goes out over whatever the handshake opened', async (t) => {
   t.is(origin.seen[0].from, '127.0.0.1', 'and the origin saw the proxy')
 })
 
+// Every http-target agent writes the request to whatever the handshake opened, with nothing
+// negotiated on top, so port 443 means an https: target has reached the agent built for
+// http: — which is what bare-fetch does when it follows a redirect that changes scheme,
+// since it keeps the agent it was handed and an agent under bare-http1 *is* the scheme.
+test('the http agent refuses to carry a plain request to port 443', async (t) => {
+  const proxy = await demoProxy(t)
+  const agents = agentsFor(t, proxy.port)
+
+  const err = await fetch('https://secret.example/vault', { agent: agents.http }).then(
+    () => null,
+    (err) => proxyErrorIn(err) ?? err
+  )
+
+  t.is(err?.code, 'PROXY_ERROR')
+  t.ok(/port 443/.test(err.message), err.message)
+  t.alike(proxy.asked, [], 'and the handshake was never spoken')
+})
+
+test('the https agent is the one that may, since it is the one that runs TLS', async (t) => {
+  const proxy = await demoProxy(t)
+  const agents = agentsFor(t, proxy.port)
+
+  // No TLS server behind the demo proxy, so this fails — but at the handshake having been
+  // spoken, which is the half being asserted.
+  await fetch('https://secret.example/vault', { agent: agents.https }).catch(() => {})
+
+  t.alike(proxy.asked, ['secret.example:443'])
+})
+
 test('bytes the target already sent are kept, not lost with the handshake', async (t) => {
   // The proxy answers its handshake and the target's first bytes in one write, which is
   // what a real one does whenever the target is quick.
   const proxy = await demoProxy(t, { greeting: 'early bytes\n' })
   const socket = new ProxySocket(
-    { proxy: parseProxyUrl(`demo://127.0.0.1:${proxy.port}`, PORTS), handshake },
+    { proxy: parseProxyUrl(`demo://127.0.0.1:${proxy.port}`, SCHEMES), handshake },
     { host: 'target.example', port: 80 }
   )
   t.teardown(() => socket.destroy())
@@ -99,7 +132,7 @@ test('bytes the target already sent are kept, not lost with the handshake', asyn
 test('a proxy that never answers gives up rather than waiting for good', async (t) => {
   const port = await listener(t, () => {}) // accepts, says nothing
   const socket = new ProxySocket(
-    { proxy: parseProxyUrl(`demo://127.0.0.1:${port}`, PORTS), handshake, timeout: 200 },
+    { proxy: parseProxyUrl(`demo://127.0.0.1:${port}`, SCHEMES), handshake, timeout: 200 },
     { host: 'target.example', port: 80 }
   )
 
@@ -112,7 +145,7 @@ test('a socket an agent is done with can be settled before it is even open', (t)
   // The order bare-http1 uses when it hands a connection back: these all land while the
   // handshake is still in flight, and must be applied to the socket once there is one.
   const socket = new ProxySocket(
-    { proxy: parseProxyUrl('demo://127.0.0.1:1', PORTS), handshake },
+    { proxy: parseProxyUrl('demo://127.0.0.1:1', SCHEMES), handshake },
     { host: 'target.example', port: 80 }
   )
   t.is(socket.setKeepAlive(true, 1000), socket)
@@ -135,7 +168,7 @@ async function handshake({ socket, reader, proxy, target }) {
 
 function agentsFor(t, port) {
   const agents = createAgents({
-    proxy: parseProxyUrl(`demo://127.0.0.1:${port}`, PORTS),
+    proxy: parseProxyUrl(`demo://127.0.0.1:${port}`, SCHEMES),
     handshake
   })
   t.teardown(() => {

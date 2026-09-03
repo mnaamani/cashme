@@ -15,10 +15,15 @@ test('an http proxy url is read, and an https one says the first hop is TLS', (t
     password: '',
     secure: false
   })
-  t.is(parse('https://proxy.example').secure, true, 'the proxy itself is reached over TLS')
-  t.is(parse('http://proxy.example').port, 8080)
-  t.is(parse('https://proxy.example').port, 443)
-  t.exception.all(() => parse('socks5://127.0.0.1:9050'), /unsupported proxy scheme/)
+  t.is(parse('https://proxy.example:443').secure, true, 'the proxy itself is reached over TLS')
+  t.is(parse('https://proxy.example:443').port, 443, 'a default port written down is kept')
+  t.is(parse('http://proxy.example:80').port, 80)
+  t.exception.all(
+    () => parse('http://proxy.example'),
+    /names no port/,
+    'a port is written down, never guessed at — 80, 443, 1080 and 8080 all have a claim'
+  )
+  t.exception.all(() => parse('socks5://127.0.0.1:1080'), /unsupported proxy scheme/)
 })
 
 test('an agent says what it speaks and what it was configured with', (t) => {
@@ -82,6 +87,52 @@ test('a target on a port of its own keeps it in the forwarded url', async (t) =>
   await fetch(`http://127.0.0.1:${origin.port}/hello`, { agent: agentFor(t, proxy.port) })
 
   t.ok(proxy.lines[0].includes(`127.0.0.1:${origin.port}/hello`), proxy.lines[0])
+})
+
+// `new URL(path, origin)` reads a path that begins with // as an authority, so resolving the
+// path against the origin — which is what http-proxy-agent does — forwards
+// http://mint.example//v1/info as a request to a host called `v1`.
+test('a path that begins with // is a path, not another host', async (t) => {
+  const origin = await server(t)
+  const proxy = await forwardProxy(t)
+
+  await fetch(`http://127.0.0.1:${origin.port}//v1/info`, { agent: agentFor(t, proxy.port) })
+
+  t.is(proxy.lines[0], `GET http://127.0.0.1:${origin.port}//v1/info HTTP/1.1`)
+})
+
+// A path may contain a url without being one — half of lnurl looks like this. Testing the
+// path for `://` to decide whether it has been rewritten already answers yes for these, and
+// the request then goes out in origin-form with no Proxy-Authorization on it.
+test('a path that merely contains a url is still rewritten', async (t) => {
+  const origin = await server(t)
+  const proxy = await forwardProxy(t)
+
+  await fetch(`http://127.0.0.1:${origin.port}/go?to=https://x.example/y`, {
+    agent: agentFor(t, proxy.port, 'me:s3cret@')
+  })
+
+  t.is(proxy.lines[0], `GET http://127.0.0.1:${origin.port}/go?to=https://x.example/y HTTP/1.1`)
+  t.alike(proxy.credentials, ['me:s3cret'], 'and it still carries the credentials')
+})
+
+// bare-fetch follows redirects itself and keeps the agent it was given for every hop, but an
+// agent under bare-http1 *is* the scheme. So an http: url that redirects to an https: one
+// arrives here, and forwarding it would ask the proxy to fetch in the clear what was asked
+// for in confidence.
+test('a plain http request to port 443 is refused, not downgraded', async (t) => {
+  const proxy = await forwardProxy(t)
+
+  const err = await fetch('https://secret.example/vault', {
+    agent: agentFor(t, proxy.port)
+  }).then(
+    () => null,
+    (err) => proxyErrorIn(err) ?? err
+  )
+
+  t.is(err?.code, 'PROXY_ERROR')
+  t.ok(/port 443/.test(err.message), err.message)
+  t.alike(proxy.lines, [], 'and nothing was written to the proxy')
 })
 
 test('what the proxy answers is what the caller gets, 407 included', async (t) => {

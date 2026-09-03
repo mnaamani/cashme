@@ -55,15 +55,12 @@ export function parse(url) {
   const speaks = SCHEMES[protocolOf(url)]
   if (!speaks) {
     // parseProxyUrl says which schemes are on offer, and says it the same way for a url with
-    // no scheme we know as for one that is not a url at all. Both come through here.
-    return parseProxyUrl(url, PORTS)
+    // no scheme we know as for one that is not a url at all. Both come through here, and
+    // both leave by throwing.
+    return parseProxyUrl(url, Object.keys(SCHEMES))
   }
   return speaks.parse(url)
 }
-
-// Only ever reached to be refused, so the ports in it are never used — what it carries is
-// the list of schemes in the message.
-const PORTS = Object.fromEntries(Object.keys(SCHEMES).map((scheme) => [scheme, 0]))
 
 // `{ http, https }` — an agent for http: targets and one for https: ones, both going
 // through `proxy`, which is a url string, a URL, or something `parse()` returned.

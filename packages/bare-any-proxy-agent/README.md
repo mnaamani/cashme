@@ -19,7 +19,7 @@ Nothing is implemented here — this is the table. The protocols live in
 ```js
 import { createAgents } from 'bare-any-proxy-agent'
 
-const agents = createAgents('socks5://127.0.0.1:9050') // or http://, https://, socks5h://
+const agents = createAgents('socks5://127.0.0.1:1080') // or http://, https://, socks5h://
 
 const response = await fetch('https://example.com', { agent: agents.https })
 const socket = new Socket('wss://relay.example', { agent: agents.https }) // bare-ws
@@ -51,7 +51,9 @@ decides: `http:` and `ws:` take `agents.http`, `https:` and `wss:` take `agents.
 
 The proxy url, read by the package that speaks its scheme. Throws with the schemes named for
 one that nothing here speaks — a proxy url that cannot be honoured is better refused than
-quietly ignored, since going direct is exactly what whoever set it was trying to prevent.
+quietly ignored, since going direct is exactly what whoever set it was trying to prevent. A
+url with no port is refused for its own reason: every scheme here has a port some client
+treats as its default and no two agree, so none of them is guessed.
 
 #### `protocols`
 

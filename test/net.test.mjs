@@ -103,13 +103,53 @@ test('a request that answers is not stopped, and leaves no timer behind', async 
   t.is(await response.text(), 'hello from the origin')
 })
 
+// bare-fetch follows redirects itself and keeps, for every hop, the agent it was handed —
+// but an agent under bare-http1 *is* the scheme: it is the thing that decides whether TLS
+// runs. So an http: url that redirects to an https: one is fetched by the agent built for
+// http, in the clear, and without this the body comes back as though it had been read over
+// TLS. Only reachable with a proxy configured: with no agent of ours, bare-fetch picks its
+// own per hop and picks correctly.
+test('a redirect that changes scheme is refused rather than fetched in the clear', async (t) => {
+  t.teardown(clearNetwork)
+  // The agents refuse an https: target on port 443 before anything is written, so what is
+  // left for this to cover is an https: url on some other port — where the request does go
+  // out, in the clear, and it is the answer that must not be handed back. The plain http
+  // server standing in for it is exactly what the downgrade would have reached.
+  const landing = await server(t)
+  const origin = await redirector(t, `https://127.0.0.1:${landing.port}/landed`)
+  const proxy = await socks5(t)
+  configureNetwork({ proxy: `socks5://127.0.0.1:${proxy.port}` })
+
+  const failure = await fetch(`http://127.0.0.1:${origin.port}/start`).then(
+    () => null,
+    (err) => err
+  )
+
+  t.is(failure?.code, 'PROXY_SCHEME_CHANGED')
+  t.ok(/redirected from http:\/\/ to https:\/\//.test(failure.message), failure.message)
+  t.is(landing.seen.length, 1, 'the hop did go out — which is why the answer is refused')
+})
+
+// With nothing to read a destination from there is no policy to apply, and handing it on
+// would be a request leaving this machine around the proxy the user asked for.
+test('a request whose destination cannot be read is refused under a proxy', async (t) => {
+  t.teardown(clearNetwork)
+  configureNetwork({ proxy: 'socks5://127.0.0.1:1080' })
+
+  const failure = await fetch('not a url').then(
+    () => null,
+    (err) => err
+  )
+  t.ok(/a proxy is in force/.test(failure?.message ?? ''), failure?.message)
+})
+
 test('a proxy failure is found again under a library that rewrapped it', (t) => {
   t.teardown(clearNetwork)
-  configureNetwork({ proxy: 'socks5://127.0.0.1:9050' })
+  configureNetwork({ proxy: 'socks5://127.0.0.1:1080' })
 
   // What coco does with an unreachable mint: its own message, ours underneath, and the
   // code lost on the way.
-  const underneath = new Error('could not reach the proxy at socks5://127.0.0.1:9050: refused')
+  const underneath = new Error('could not reach the proxy at socks5://127.0.0.1:1080: refused')
   const wrapped = new Error('Failed to fetch mint https://mint.example', { cause: underneath })
   t.is(proxyFailure(wrapped), underneath)
   t.is(proxyFailure(new Error('the wallet is locked')), null, 'and nothing else is mistaken for it')
@@ -118,8 +158,8 @@ test('a proxy failure is found again under a library that rewrapped it', (t) => 
 test('every scheme we claim to speak picks an agent, and nothing else is accepted', (t) => {
   t.teardown(clearNetwork)
   for (const url of [
-    'socks5://127.0.0.1:9050',
-    'socks5h://127.0.0.1:9050',
+    'socks5://127.0.0.1:1080',
+    'socks5h://127.0.0.1:1080',
     'http://127.0.0.1:3128',
     'https://proxy.example:443'
   ]) {
@@ -133,6 +173,23 @@ test('every scheme we claim to speak picks an agent, and nothing else is accepte
     /unsupported proxy scheme/
   )
   t.exception.all(() => configureNetwork({ proxy: 'not a url' }), /not a proxy url/)
+})
+
+// Every scheme has a port some client treats as its default and no two agree, so none of
+// them is guessed: a guess that lands on the wrong service is handed the credentials before
+// anything notices.
+test('a proxy with no port is refused, and says which setting to go and fix', (t) => {
+  t.teardown(clearNetwork)
+  for (const url of ['socks5://127.0.0.1', 'http://proxy.lan', 'proxy.lan']) {
+    t.exception.all(
+      () => configureNetwork({ proxy: url }),
+      /--proxy: the proxy url names no port/,
+      url
+    )
+  }
+
+  t.teardown(withEnv({ https_proxy: 'proxy.lan' }))
+  t.exception.all(() => configureNetwork(), /https_proxy: the proxy url names no port/)
 })
 
 // An http proxy does two different jobs, and which one a request gets is decided here rather
@@ -151,14 +208,14 @@ test('an http proxy forwards http targets and tunnels https ones', (t) => {
 
 test('--proxy picks the agent, and leaves the wires it was never going to carry alone', (t) => {
   t.teardown(clearNetwork)
-  configureNetwork({ proxy: 'socks5://127.0.0.1:9050' })
+  configureNetwork({ proxy: 'socks5://127.0.0.1:1080' })
 
   t.ok(agentFor('https://mint.example'), 'https requests get an agent')
   t.ok(agentFor('wss://relay.example'), 'so do relays')
   t.is(agentFor('https://mint.example'), agentFor('wss://relay.example'), 'the same one')
   t.unlike(agentFor('http://mint.example'), agentFor('https://mint.example'))
-  t.is(networkPolicy().proxyName, 'socks5://127.0.0.1:9050')
-  t.alike(proxyInForce(), { name: 'socks5://127.0.0.1:9050', source: '--proxy' })
+  t.is(networkPolicy().proxyName, 'socks5://127.0.0.1:1080')
+  t.alike(proxyInForce(), { name: 'socks5://127.0.0.1:1080', source: '--proxy' })
 
   // The hyperdht and the local network were never http, so a proxy neither carries them nor
   // stops them: `give --dht` swaps at the mint through the proxy and hands over directly.
@@ -168,7 +225,7 @@ test('--proxy picks the agent, and leaves the wires it was never going to carry 
 test('a proxy named for this wallet is exempt from no_proxy', (t) => {
   t.teardown(withEnv({ no_proxy: 'mint.example,*' }))
   t.teardown(clearNetwork)
-  configureNetwork({ proxy: 'socks5://127.0.0.1:9050' })
+  configureNetwork({ proxy: 'socks5://127.0.0.1:1080' })
 
   t.ok(agentFor('https://mint.example'), 'the flag covers everything, no exceptions')
   t.ok(agentFor('https://anything.example'))
@@ -199,7 +256,7 @@ test(
   'http_proxy is read in lower case only, so a Proxy: header cannot set it',
   { skip: isWindows },
   (t) => {
-    t.teardown(withEnv({ HTTP_PROXY: 'socks5://attacker.example:9050' }))
+    t.teardown(withEnv({ HTTP_PROXY: 'socks5://attacker.example:1080' }))
     t.teardown(clearNetwork)
     configureNetwork({})
 
@@ -435,6 +492,19 @@ function server(t) {
   close(t, server)
   return new Promise((resolve) => {
     server.listen(0, '127.0.0.1', () => resolve({ port: server.address().port, seen }))
+  })
+}
+
+// An origin that answers everything with a redirect to somewhere else.
+function redirector(t, location) {
+  const server = http.createServer((req, res) => {
+    res.statusCode = 302
+    res.setHeader('location', location)
+    res.end()
+  })
+  close(t, server)
+  return new Promise((resolve) => {
+    server.listen(0, '127.0.0.1', () => resolve({ port: server.address().port }))
   })
 }
 

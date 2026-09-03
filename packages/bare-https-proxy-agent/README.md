@@ -40,6 +40,21 @@ inside: `agents.https` negotiates TLS with the target through the tunnel, and th
 certificate is checked against the host that was asked for. Nothing is sent beyond what the
 method needs — no user agent, no cookies.
 
+## An https: target is refused
+
+Every agent for `http:` targets — this one, and the SOCKS and forwarding ones — writes the
+request to whatever it opened with nothing negotiated on top, which here means straight into
+the tunnel. So a target on port 443 means an `https:` url has reached the agent built for
+`http:`, and carrying it would send in the clear what was asked for in confidence. That is refused with a `ProxyError` before anything
+is written.
+
+It is not a hypothetical. `bare-fetch` follows redirects itself and keeps, for every hop, the
+agent it was handed — but an agent under bare-http1 _is_ the scheme, since it is the thing
+that decides whether TLS runs. So an `http:` url that redirects to an `https:` one arrives at
+the wrong agent. A caller that follows redirects itself should re-pick the agent per hop; one
+that cannot should treat a response whose final url changed scheme as a failure, because the
+guard only covers the default port.
+
 ## API
 
 #### `createAgents(proxy[, opts])`
@@ -56,7 +71,11 @@ The two agents on their own, for when only one is wanted.
 
 `{ protocol, host, port, username, password, secure }` for an `http://` or `https://` proxy
 url, `secure` saying whether the proxy itself is reached over TLS. Host and port only — a
-path or a query is refused rather than guessed at.
+path or a query is refused rather than guessed at, and so is a missing port. There is no
+default worth having: `http-proxy-agent` reads a port-less proxy url as port 80, curl reads
+it as 1080, and 8080 is where proxies actually tend to listen. A guess that lands on the
+wrong service is handed the `Proxy-Authorization` header before anything notices, and the
+port is one word that only the person configuring it knows.
 
 #### `handshake({ socket, reader, proxy, target })`
 

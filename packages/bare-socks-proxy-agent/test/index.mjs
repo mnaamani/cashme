@@ -14,16 +14,20 @@ import {
 } from '../index.mjs'
 
 test('the two socks schemes are the same proxy, spelled two ways', (t) => {
-  t.alike(parse('socks5://127.0.0.1:9050'), {
+  t.alike(parse('socks5://127.0.0.1:1080'), {
     protocol: 'socks5:',
     host: '127.0.0.1',
-    port: 9050,
+    port: 1080,
     username: '',
     password: '',
     secure: false
   })
-  t.is(parse('socks5h://127.0.0.1:9050').protocol, 'socks5h:', 'kept, so errors quote it back')
-  t.is(parse('socks5://127.0.0.1').port, 1080, 'the usual socks port when none is given')
+  t.is(parse('socks5h://127.0.0.1:1080').protocol, 'socks5h:', 'kept, so errors quote it back')
+  t.exception.all(
+    () => parse('socks5://127.0.0.1'),
+    /names no port/,
+    'not read as 1080 — the port is written down, never guessed'
+  )
   t.exception.all(() => parse('http://127.0.0.1:3128'), /unsupported proxy scheme/)
 })
 
@@ -32,9 +36,9 @@ test('an agent says what it speaks and what it was configured with', (t) => {
   t.alike(SocksProxyHTTPAgent.protocols, ['socks5', 'socks5h'])
   t.alike(SocksProxyHTTPSAgent.protocols, ['socks5', 'socks5h'])
 
-  const agent = new SocksProxyHTTPAgent('socks5://me:s3cret@127.0.0.1:9050')
+  const agent = new SocksProxyHTTPAgent('socks5://me:s3cret@127.0.0.1:1080')
   t.teardown(() => agent.destroy())
-  t.is(agent.proxyUrl, 'socks5://127.0.0.1:9050', 'the address, never the password')
+  t.is(agent.proxyUrl, 'socks5://127.0.0.1:1080', 'the address, never the password')
   t.is(agent.proxy.host, '127.0.0.1')
   t.is(agent.proxy.username, 'me')
 
@@ -44,7 +48,7 @@ test('an agent says what it speaks and what it was configured with', (t) => {
   t.is(fromUrl.proxyUrl, 'socks5h://127.0.0.1:1080')
 
   // And a proxy already parsed, so one parse can serve both agents.
-  const parsed = parse('socks5://127.0.0.1:9050')
+  const parsed = parse('socks5://127.0.0.1:1080')
   t.is(new SocksProxyHTTPSAgent(parsed).proxy, parsed)
 })
 

@@ -27,11 +27,14 @@ import {
   proxyName
 } from 'bare-proxy-agent'
 
-// Where a CONNECT proxy listens when the url names no port.
-export const PORTS = { 'http:': 8080, 'https:': 443 }
+// The schemes a proxy url may be written with. It is the proxy url being read here, not
+// the target's, so an https:// one is a proxy reached over TLS. No default port goes with
+// them: a port-less proxy url is refused rather than read as 80 or 443, which is what
+// https-proxy-agent reads it as — see parseProxyUrl.
+export const SCHEMES = ['http:', 'https:']
 
 export function parse(url) {
-  const proxy = parseProxyUrl(url, PORTS)
+  const proxy = parseProxyUrl(url, SCHEMES)
   // The one thing the base cannot work out for itself: whether to reach the proxy over TLS.
   proxy.secure = proxy.protocol === 'https:'
   return proxy
@@ -44,6 +47,12 @@ export async function handshake({ socket, reader, proxy, target, headers }) {
   const name = proxyName(proxy)
   const to = authority(target)
 
+  // This request head is built here rather than by bare-http1, so nothing upstream has
+  // checked any of it for the characters that end a line. A target or a header value
+  // carrying CR or LF would add lines to the request the caller never wrote — a second
+  // CONNECT, to somewhere else, being the one that matters.
+  if (/[\r\n\0\s]/.test(to)) throw new ProxyError(`not a host and port to tunnel to: ${to}`)
+
   let head = `CONNECT ${to} HTTP/1.1\r\nHost: ${to}\r\n`
   if (hasCredentials(proxy)) {
     const credentials = Buffer.from(`${proxy.username}:${proxy.password}`).toString('base64')
@@ -51,8 +60,13 @@ export async function handshake({ socket, reader, proxy, target, headers }) {
   }
   // Anything the caller wants the proxy to see, as https-proxy-agent's `headers` does. The
   // proxy is the one hop reading these, so nothing is added here that was not asked for.
-  for (const [name, value] of Object.entries(headers ?? {})) {
-    if (value !== undefined && value !== null) head += `${name}: ${value}\r\n`
+  for (const [header, value] of Object.entries(headers ?? {})) {
+    if (value === undefined || value === null) continue
+    if (!TOKEN.test(header)) throw new ProxyError(`not a header name: ${header}`)
+    if (/[\r\n\0]/.test(String(value))) {
+      throw new ProxyError(`the value of ${header} cannot carry a newline`)
+    }
+    head += `${header}: ${value}\r\n`
   }
   socket.write(`${head}\r\n`)
 
@@ -66,6 +80,9 @@ export async function handshake({ socket, reader, proxy, target, headers }) {
   }
   if (status !== 200) throw new ProxyError(`${name} refused a tunnel to ${to}: HTTP ${status}`)
 }
+
+// RFC 9110 §5.1 field-name.
+const TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/
 
 function tunnel(proxy) {
   const parsed = typeof proxy === 'object' && proxy !== null && !isURL(proxy) ? proxy : parse(proxy)
@@ -96,10 +113,12 @@ export class HttpsProxyHTTPAgent extends ProxyHTTPAgent {
   }
 
   // Read per connection, so headers given as a function are called per tunnel rather than
-  // once at construction.
+  // once at construction. Built on `super.tunnel` rather than on `_tunnel`, which is what
+  // keeps ProxyHTTPAgent's refusal of an https: target in front of the handshake.
   get tunnel() {
+    const base = super.tunnel
     const headers = headersOf(this.proxyHeaders)
-    return { ...this._tunnel, handshake: (args) => handshake({ ...args, headers }) }
+    return { ...base, handshake: (args) => base.handshake({ ...args, headers }) }
   }
 }
 
@@ -113,8 +132,9 @@ export class HttpsProxyHTTPSAgent extends ProxyHTTPSAgent {
   }
 
   get tunnel() {
+    const base = super.tunnel
     const headers = headersOf(this.proxyHeaders)
-    return { ...this._tunnel, handshake: (args) => handshake({ ...args, headers }) }
+    return { ...base, handshake: (args) => base.handshake({ ...args, headers }) }
   }
 }
 

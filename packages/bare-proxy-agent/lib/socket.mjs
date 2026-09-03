@@ -34,9 +34,14 @@ export class ProxySocket extends Duplex {
 
     // Held until there is a socket to apply them to: an agent sets keep-alive and unrefs a
     // connection it is done with, both of which may happen mid-handshake.
+    //
+    // `timeout` is seeded from the options because bare-tcp's own Socket takes it that way,
+    // and an agent that sets it there — bare-http1's do, ours included — would otherwise
+    // find it quietly dropped, leaving a proxied connection with no idle timeout where a
+    // direct one has one. It is refreshed by traffic, so it bounds idleness, not the request.
     this._keepAlive = null
     this._noDelay = false
-    this._timeout = 0
+    this._timeout = opts.timeout || 0
     this._unrefed = false
   }
 

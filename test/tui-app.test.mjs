@@ -160,7 +160,7 @@ function fakeApi(overrides = {}) {
       binary: '/tmp/bare',
       storage: '/tmp/wallet',
       wallet: '/tmp/wallet/wallet.json',
-      proxy: { name: 'socks5://127.0.0.1:9050', source: 'ALL_PROXY' },
+      proxy: { name: 'socks5://127.0.0.1:1080', source: 'ALL_PROXY' },
       dhtInterface: 'en0',
       address
     }),
@@ -1205,7 +1205,7 @@ test('settings shows where this session runs and what it wears', async (t) => {
   t.ok(screen.includes('/tmp/wallet'), 'the storage this run uses')
   t.ok(screen.includes('/tmp/wallet/wallet.json'), 'and the file in it that is the wallet')
   t.ok(screen.includes('the seed is inside this file'), 'said so nobody hunts for a seed file')
-  t.ok(screen.includes('socks5://127.0.0.1:9050'), 'the proxy in force')
+  t.ok(screen.includes('socks5://127.0.0.1:1080'), 'the proxy in force')
   t.ok(screen.includes('from ALL_PROXY'), 'and where it came from')
   t.ok(screen.includes('en0'), 'the interface the hyperdht is pinned to')
 

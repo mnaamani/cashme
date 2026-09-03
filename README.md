@@ -2,7 +2,9 @@
 
 > A cashu wallet in your terminal, send and receive ecash over Bluetooth.
 
-## EXPERIMENTAL - Use at your own risk !!
+## EXPERIMENTAL - Use at your own risk !
+
+cashme is made for educational, research and testing purposes only.
 
 ## Install
 

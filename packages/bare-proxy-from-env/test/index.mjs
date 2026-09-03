@@ -31,8 +31,8 @@ test('http_proxy is read in lower case only', (t) => {
 })
 
 test('ALL_PROXY covers a scheme with no proxy of its own', (t) => {
-  t.teardown(withEnv({ all_proxy: 'socks5://127.0.0.1:9050', https_proxy: 'http://secure.lan:1' }))
-  t.is(proxyForProtocol('http:').url, 'socks5://127.0.0.1:9050')
+  t.teardown(withEnv({ all_proxy: 'socks5://127.0.0.1:1080', https_proxy: 'http://secure.lan:1' }))
+  t.is(proxyForProtocol('http:').url, 'socks5://127.0.0.1:1080')
   t.is(proxyForProtocol('http:').source, 'all_proxy')
   t.is(proxyForProtocol('https:').url, 'http://secure.lan:1', 'a scheme’s own still wins')
 })
@@ -51,7 +51,7 @@ test('websockets are read as the scheme they are an upgrade of', (t) => {
 
 test('a scheme-less value is a proxy reached over http', (t) => {
   t.is(normalize('127.0.0.1:3128'), 'http://127.0.0.1:3128')
-  t.is(normalize(' socks5://127.0.0.1:9050 '), 'socks5://127.0.0.1:9050', 'trimmed, not touched')
+  t.is(normalize(' socks5://127.0.0.1:1080 '), 'socks5://127.0.0.1:1080', 'trimmed, not touched')
   t.is(normalize('ftp://127.0.0.1:21'), 'ftp://127.0.0.1:21', 'even one nothing can speak')
 })
 

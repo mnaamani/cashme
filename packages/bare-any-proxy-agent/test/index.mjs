@@ -11,16 +11,16 @@ test('every scheme there is an agent for', (t) => {
 })
 
 test('a socks proxy makes a pair of socks agents', (t) => {
-  const agents = destroyed(t, createAgents('socks5://127.0.0.1:9050'))
+  const agents = destroyed(t, createAgents('socks5://127.0.0.1:1080'))
   t.ok(agents.http instanceof SocksProxyHTTPAgent)
   t.ok(agents.https instanceof SocksProxyHTTPSAgent)
-  t.is(agents.http.proxyUrl, 'socks5://127.0.0.1:9050')
+  t.is(agents.http.proxyUrl, 'socks5://127.0.0.1:1080')
 })
 
 test('socks5h is the same proxy, spelled the way it was configured', (t) => {
-  const agents = destroyed(t, createAgents('socks5h://127.0.0.1:9050'))
+  const agents = destroyed(t, createAgents('socks5h://127.0.0.1:1080'))
   t.ok(agents.https instanceof SocksProxyHTTPSAgent)
-  t.is(agents.https.proxyUrl, 'socks5h://127.0.0.1:9050')
+  t.is(agents.https.proxyUrl, 'socks5h://127.0.0.1:1080')
 })
 
 // The one scheme where the two agents are not the same protocol: an http: target is
@@ -36,16 +36,26 @@ test('an http proxy forwards http targets and tunnels https ones', (t) => {
 })
 
 test('an https proxy is the same, reached over TLS', (t) => {
-  const agents = destroyed(t, createAgents('https://proxy.example'))
+  const agents = destroyed(t, createAgents('https://proxy.example:8443'))
   t.ok(agents.http instanceof HttpProxyAgent)
   t.ok(agents.https instanceof HttpsProxyHTTPSAgent)
   t.is(agents.http.proxy.secure, true, 'the first hop is TLS')
-  t.is(agents.http.proxy.port, 443, 'and the port the scheme implies')
+  t.is(agents.http.proxy.port, 8443)
+})
+
+// Every scheme here has a port some client somewhere treats as its default, and no two agree
+// — so none of them is guessed. The one word costs less than a Proxy-Authorization header
+// handed to whatever was listening on the guess.
+test('a proxy url with no port is refused, whatever its scheme', (t) => {
+  for (const url of ['http://proxy.lan', 'https://proxy.lan', 'socks5://127.0.0.1']) {
+    t.exception.all(() => parse(url), /names no port/, url)
+    t.exception.all(() => createAgents(url), /names no port/, url)
+  }
 })
 
 test('a url is read once, and what it read can be handed back', (t) => {
-  const proxy = parse('socks5://me:s3cret@127.0.0.1:9050')
-  t.is(proxyName(proxy), 'socks5://127.0.0.1:9050', 'the address, never the password')
+  const proxy = parse('socks5://me:s3cret@127.0.0.1:1080')
+  t.is(proxyName(proxy), 'socks5://127.0.0.1:1080', 'the address, never the password')
 
   const agents = destroyed(t, createAgents(proxy))
   t.is(agents.http.proxy, proxy, 'the same object, not parsed a second time')

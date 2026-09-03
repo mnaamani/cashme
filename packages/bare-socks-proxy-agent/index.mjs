@@ -18,8 +18,10 @@ import {
   proxyName
 } from 'bare-proxy-agent'
 
-// Where a SOCKS5 proxy listens when the url names no port.
-export const PORTS = { 'socks5:': 1080, 'socks5h:': 1080 }
+// The schemes a proxy url may be written with here. No default port goes with them: a
+// port-less proxy url is refused rather than read as 1080, which is what socks-proxy-agent
+// and curl both read it as — see parseProxyUrl.
+export const SCHEMES = ['socks5:', 'socks5h:']
 
 // Reply codes worth naming (RFC 1928 §6). The rest are reported by number.
 const REPLIES = {
@@ -34,7 +36,7 @@ const REPLIES = {
 }
 
 export function parse(url) {
-  return parseProxyUrl(url, PORTS)
+  return parseProxyUrl(url, SCHEMES)
 }
 
 // The handshake, with username and password authentication (RFC 1929) when the proxy url

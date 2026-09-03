@@ -22,7 +22,7 @@ a program's traffic:
 ```js
 import { createAgents, parseProxyUrl, ProxyError, authority } from 'bare-proxy-agent'
 
-const proxy = parseProxyUrl('demo://127.0.0.1:1080', { 'demo:': 1080 })
+const proxy = parseProxyUrl('demo://127.0.0.1:1080', ['demo:'])
 
 // Called once per connection, on a socket to the proxy. Resolve and everything after
 // belongs to the target; throw a ProxyError and the request fails with your words.
@@ -67,7 +67,10 @@ handed to the stream, so a target that answers immediately loses nothing.
 #### `parseProxyUrl(url, ports)`
 
 `{ protocol, host, port, username, password, secure }`, with `ports` giving the default port
-per scheme. Host and port only — a path or a query is refused rather than guessed at. An
+per scheme. `schemes` is the list this protocol answers to, spelled with the colon. Host and
+port only — a path or a query is refused rather than guessed at, and so is a missing port:
+every scheme has a port some client treats as its default, no two agree, and a guess that
+lands on the wrong service is handed the credentials before anything notices. An
 IPv6 host comes back without its brackets; `authority({ host, port })` puts them back.
 
 #### `proxyName(proxy)` · `authority(target)` · `hasCredentials(proxy)`
@@ -92,6 +95,22 @@ both, which is why `createAgents()` returns a pair.
 
 `agent-base` itself cannot be reused: Bare has no `net`, `tls` or `http` builtins, and it is
 written against Node's `http.Agent` internals.
+
+## What the base refuses
+
+`ProxyHTTPAgent` writes the request to whatever the handshake opened, with nothing negotiated
+on top, so a target on port 443 means an `https:` url has reached the agent built for `http:`
+— and carrying it would send in the clear what was asked for in confidence. The handshake is
+refused with a `ProxyError` before anything is written. `ProxyHTTPSAgent`, which runs TLS, is
+exempt.
+
+The way an https: target reaches the wrong agent is a redirect: `bare-fetch` follows them
+itself and keeps, for every hop, the agent it was handed, while an agent under bare-http1
+_is_ the scheme. The guard covers the default port; a caller that follows redirects should
+re-pick the agent per hop, or refuse a response whose final url changed scheme.
+
+An agent that overrides `get tunnel()` must build on `super.tunnel` rather than on
+`_tunnel`, or it drops the guard along with it.
 
 ## Licence
 
