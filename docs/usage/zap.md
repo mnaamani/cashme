@@ -31,6 +31,19 @@ What happens on a run:
 request, and `--event` tags the note being zapped, which is what puts the receipt under that
 note in a client rather than only on the recipient.
 
+A note is named as a `note1…`, an `nevent1…`, or the bare 64-character hex id — the three
+forms NIP-19 writes an event id, none of them typeable. An `nevent1…` is worth preferring:
+it carries the relays the note was seen on, which are added to the lookup, and sometimes the
+author, which is checked before any relay is asked anything.
+
+**The note is checked to be theirs before an invoice is asked for.** It is read back from
+the relays, verified against its own id and signature, and its author compared with the
+person being paid; a note nobody has, or one written by somebody else, stops the run rather
+than being paid for. The `e` tag is what attributes the zap, nothing downstream checks it,
+and a lightning payment cannot be recalled and re-tagged. Naming a note when there is no
+nostr key behind the recipient — a plain lightning address — stops the run too, rather than
+paying and silently dropping the attribution.
+
 The invoice the host returns is checked against the amount we asked for before anything is
 spent. Nothing about lnurl is signed, so a host that returns an invoice for some other
 amount is refused rather than paid.

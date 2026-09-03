@@ -39,6 +39,17 @@ What happens on a run:
    and `--event` tags the note being zapped, so clients can show it under that note rather
    than only in the recipient's inbox.
 
+A note is named as a `note1…`, an `nevent1…`, or the bare 64-character hex id — the three
+forms NIP-19 writes an event id, none of them typeable. An `nevent1…` also carries the
+relays the note was seen on, which are added to the lookup, and sometimes its author, which
+is checked before any relay is asked anything.
+
+**The note is checked to be theirs while the ecash is still ours.** It is read back from the
+relays alongside the `10019`, verified against its own id and signature, and its author
+compared with the recipient — a note nobody has, or one written by somebody else, stops the
+run before any proof is reserved. Nothing downstream checks an `e` tag, and a nutzap tagged
+with the wrong note can be neither recalled nor re-tagged.
+
 ```
 Resolving alice@example.com
   alice@example.com is 82341f882b6eabcd2ba7f1ef90aad961cf074af15b9ef44a09f9d2a8fbfbe6a2
@@ -46,6 +57,7 @@ Looking up 82341f882b6e… on 4 relays
 Spending from https://testnut.cashu.space
   amount   8 sat (+ 1 mint fee)
   locked to 026d2a9992b45f5d0885fb3abb5cb8f6e69b6e6f288dcac3f0180e566fb6ddcbce
+  on note  5c04292b1080052d593c4b0f22ba9f4f0e01a2c9e0f0b0f4f8d1c3b2a1908070
   relays   wss://relay.damus.io, wss://nos.lol
 Once sent, only the recipient can spend this ecash — it cannot be reclaimed.
 Send this nutzap? [y/N]

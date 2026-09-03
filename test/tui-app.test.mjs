@@ -126,12 +126,13 @@ function fakeApi(overrides = {}) {
       lines: ['Paying from https://mint.example', '  invoice     100 sat']
     }),
     settleWithdraw: record('settleWithdraw', { changeAmount: 1, effectiveFee: 1 }),
-    planZap: record('planZap', ({ pubkey, amount }) => ({
+    planZap: record('planZap', ({ pubkey, amount, event }) => ({
       typed: pubkey,
       recipient: 'b'.repeat(64),
       label: pubkey,
       amount,
       receipt: true,
+      note: event ? { id: 'd'.repeat(64), preview: 'gm nostr' } : null,
       warnings: [],
       melt: {
         payable: true,
@@ -139,7 +140,7 @@ function fakeApi(overrides = {}) {
       }
     })),
     settleZap: record('settleZap', { effectiveFee: 1 }),
-    planNutzap: record('planNutzap', ({ pubkey, amount }) => ({
+    planNutzap: record('planNutzap', ({ pubkey, amount, event }) => ({
       typed: pubkey,
       recipient: 'a'.repeat(64),
       lockKey: `02${'a'.repeat(64)}`,
@@ -147,6 +148,7 @@ function fakeApi(overrides = {}) {
       mintUrl: 'https://mint.example',
       amount,
       fee: 0,
+      note: event ? { id: 'c'.repeat(64), preview: 'gm nostr' } : null,
       warnings: [],
       prepared: { id: 'p1' }
     })),
@@ -880,12 +882,12 @@ test('a second nutzap is confirmed too, so its reserved proofs keep a way back',
   await ui.type('npub1first')
   await ui.enter()
   await ui.type('21')
-  await ui.enter(4) // past the mint and comment fields, onto the button, then press it
+  await ui.enter(5) // past the mint, note and comment fields, onto the button, then press it
   await ui.type('y')
   t.ok(ui.screen().includes('nutzapped'), 'the first one is sent')
 
   await ui.type('\x1b[B') // enter stops on the button, so the arrows go round again
-  await ui.enter(5) // back down the four fields, onto the button, then press it
+  await ui.enter(6) // back down the four fields, onto the button, then press it
   t.ok(ui.screen().includes('Nutzap'), 'the second lookup is asked about as well')
   t.is(
     api.calls.filter(([name]) => name === 'settleNutzap').length,
@@ -1759,7 +1761,7 @@ test('zap quotes before it spends, and says whether there will be a receipt', as
   await ui.type('npub1someone')
   await ui.enter(1)
   await ui.type('21')
-  await ui.enter(3) // past the comment field, onto the button, then press it
+  await ui.enter(4) // past the note and comment fields, onto the button, then press it
 
   t.is(api.calls.find(([name]) => name === 'planZap')?.[1].amount, 21, 'the amount is quoted')
   t.ok(ui.screen().includes('Zap 21 sat to npub1someone?'), 'and confirmation is asked for')
@@ -1797,7 +1799,7 @@ test('a zap with no receipt says so before it is paid', async (t) => {
   await ui.type('someone@example.com')
   await ui.enter(1)
   await ui.type('21')
-  await ui.enter(3)
+  await ui.enter(4)
 
   t.ok(ui.screen().includes('no zap receipt'), 'the thing that makes it a zap is missing, and said')
 
@@ -1813,7 +1815,7 @@ test('a nutzap reserves proofs, and refusing hands them back', async (t) => {
   await ui.type('npub1someone')
   await ui.enter(1)
   await ui.type('21')
-  await ui.enter(4) // past mint and comment, onto the button, then press it
+  await ui.enter(5) // past mint, note and comment, onto the button, then press it
 
   t.ok(
     api.calls.some(([name]) => name === 'planNutzap'),
@@ -1846,6 +1848,44 @@ test('a nutzap reserves proofs, and refusing hands them back', async (t) => {
   ui.app.unmount()
 })
 
+// The note a zap is aimed at goes in as it was pasted, and comes back checked: what the
+// screen shows is the note the lookup found, not the string that was typed at it.
+test('a zap or nutzap can be aimed at a note, and says which one before it pays', async (t) => {
+  const NOTE = 'note1tszzj2cssqzj6kfufv8j9w5lfu8qrgkfurctpa8c68pm9gvsspcq2d7ve0'
+
+  for (const [action, plan, id] of [
+    ['zap', 'planZap', 'd'.repeat(64)],
+    ['nutzap', 'planNutzap', 'c'.repeat(64)]
+  ]) {
+    const api = fakeApi()
+    const ui = mount(api, { columns: 96, rows: 40 })
+    await ui.flush()
+
+    await ui.pick(action)
+    await ui.type('npub1someone')
+    await ui.enter(1)
+    await ui.type('21')
+    // The note field sits before the comment, and after the mint on the nutzap screen.
+    await ui.enter(action === 'nutzap' ? 2 : 1)
+    await ui.type(NOTE)
+    await ui.enter(3) // past the comment, onto the button, then press it
+
+    t.is(
+      api.calls.find(([name]) => name === plan)?.[1].event,
+      NOTE,
+      `${action}: the note is handed over as it was pasted, for the wallet to check`
+    )
+    const asked = ui.screen()
+    t.ok(
+      asked.includes(`on note`) && asked.includes(id.slice(0, 40)),
+      `${action}: the confirmation says which note`
+    )
+    t.ok(asked.includes('gm nostr'), `${action}: and what that note says`)
+
+    ui.app.unmount()
+  }
+})
+
 test('a nutzap no relay accepted is not reported as a send that can be retried', async (t) => {
   const api = fakeApi({
     settleNutzap: () => ({ accepted: 0, results: [{ ok: false }], event: { id: 'e1' } })
@@ -1857,7 +1897,7 @@ test('a nutzap no relay accepted is not reported as a send that can be retried',
   await ui.type('npub1someone')
   await ui.enter(1)
   await ui.type('21')
-  await ui.enter(4)
+  await ui.enter(5)
   await ui.type('y')
 
   t.ok(ui.screen().includes('no relay accepted'), 'the screen says nothing carried it')
@@ -1899,8 +1939,8 @@ test('a confirmation and its answer keys fit on a short terminal', async (t) => 
   // so it is the first thing a terminal too short for everything cuts off.
   for (const [action, keys] of [
     ['withdraw', ['lnbc1test', '\r', '\r', '\r']],
-    ['zap', ['npub1someone', '\r', '21', '\r', '\r', '\r']],
-    ['nutzap', ['npub1someone', '\r', '21', '\r', '\r', '\r', '\r']],
+    ['zap', ['npub1someone', '\r', '21', '\r', '\r', '\r', '\r']],
+    ['nutzap', ['npub1someone', '\r', '21', '\r', '\r', '\r', '\r', '\r']],
     // The trust question has the most to lose by being cut off: it is the one that decides
     // whether a stranger's mint goes into this wallet for good.
     ['get', ['\r', 'cashuBfromastranger', '\r', '\r']]

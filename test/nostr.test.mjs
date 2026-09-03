@@ -1,6 +1,7 @@
 // Must come first: @noble needs TextEncoder at module scope.
 import '../lib/polyfills.mjs'
 import test from 'brittle'
+import * as nip19 from 'nostr-tools/nip19'
 import { schnorr } from '@noble/curves/secp256k1.js'
 import {
   parsePublicKey,
@@ -10,7 +11,10 @@ import {
   ephemeralKeypair,
   signEvent,
   tagValue,
-  tagValues
+  tagValues,
+  parseNoteId,
+  readNote,
+  notePreview
 } from '../lib/nostr.mjs'
 
 // The one key form a user is likely to paste. Vector: jack's npub, from NIP-19.
@@ -145,3 +149,79 @@ test('a nostr address is told apart from a key', (t) => {
   t.ok(isAddress('example.com'), 'a bare domain is the _@domain form')
   t.ok(isAddress('alice+tag@example.com'), 'the local part is as wide as nip05 says')
 })
+
+// The note a zap is aimed at, in the three forms NIP-19 writes an event id. Vectors encoded
+// from ID below with nip19, which is also what a client's "copy note id" button hands over.
+const ID = '5c04292b1080052d593c4b0f22ba9f4f0e01a2c9e0f0b0f4f8d1c3b2a1908070'
+const NOTE1 = 'note1tszzj2cssqzj6kfufv8j9w5lfu8qrgkfurctpa8c68pm9gvsspcq2d7ve0'
+
+test('a note id is accepted in every form nostr writes one', (t) => {
+  t.alike(parseNoteId(ID), { id: ID, relays: [], author: null }, 'bare hex, as a tag carries it')
+  t.is(parseNoteId(`  ${ID.toUpperCase()}  `).id, ID, 'a paste may carry case and whitespace')
+  t.is(parseNoteId(NOTE1).id, ID, 'note1… is the id alone')
+
+  // An nevent carries hints as well: relays it was seen on, which is where it is most
+  // likely to still be, and sometimes the author it is claimed to belong to.
+  const nevent = nip19.neventEncode({
+    id: ID,
+    relays: ['wss://relay.example', 'nope://x'],
+    author: HEX
+  })
+  t.alike(parseNoteId(nevent), { id: ID, relays: ['wss://relay.example'], author: HEX })
+})
+
+test('anything that is not a note is refused before a relay is asked', (t) => {
+  t.exception.all(() => parseNoteId(NPUB), /not a nostr note/, 'a key is not a note')
+  t.exception.all(() => parseNoteId(ID.slice(0, 40)), /not a nostr note/)
+  t.exception.all(() => parseNoteId('note1zzz'), 'a broken note1 is not a note')
+  t.exception.all(() => parseNoteId(''), /not a nostr note/)
+})
+
+// The check that stands between a zap and paying one person for another's note. What the
+// relay says is not evidence — the pool has already verified the id and signature of
+// whatever it hands over, so the author's key here is the note's own word.
+test('a note is only zapped once it is known to be theirs', async (t) => {
+  const { secretKey, publicKey } = ephemeralKeypair()
+  const theirs = signEvent({ kind: 1, content: 'hello nostr' }, secretKey)
+  const pool = fakePool([theirs])
+
+  const found = await readNote(pool, { id: theirs.id, relays: [], author: null }, publicKey)
+  t.is(found.id, theirs.id, 'their own note goes through')
+
+  const other = ephemeralKeypair()
+  await t.exception(
+    readNote(pool, { id: theirs.id, relays: [], author: null }, other.publicKey),
+    /not by/,
+    "somebody else's note is refused rather than paid for"
+  )
+
+  await t.exception(
+    readNote(fakePool([]), { id: theirs.id, relays: [], author: null }, publicKey),
+    /no note/,
+    'a note no relay has is refused: there is no way to tell whose it is'
+  )
+
+  // The nevent's own claim, disagreeing with who is being paid: the wrong thing was
+  // pasted, and it costs no relay round trip to say so.
+  await t.exception(
+    readNote(pool, { id: theirs.id, relays: [], author: other.publicKey }, publicKey),
+    /pasted from somewhere else/
+  )
+})
+
+test('a note preview is one line, and carries no escape sequences', (t) => {
+  t.is(notePreview({ kind: 1, content: '  first line\nsecond  ' }), 'first line second')
+  t.is(notePreview({ kind: 1, content: '' }), 'kind 1, no text', 'a note with no text says so')
+  t.is(
+    notePreview({ kind: 1, content: 'gm \x1b[2Jgone' }),
+    'gm [2Jgone',
+    "the escape is stripped: a stranger's note cannot repaint the confirmation it is shown in"
+  )
+  t.is(notePreview({ kind: 1, content: 'x'.repeat(80) }, 10), `${'x'.repeat(9)}…`)
+})
+
+// Only the two methods readNote uses. A relay is a thing that answers with events; what
+// makes the answer trustworthy is checked in RelayPool, not here.
+function fakePool(events) {
+  return { urls: ['wss://relay.example'], query: () => Promise.resolve(events) }
+}
