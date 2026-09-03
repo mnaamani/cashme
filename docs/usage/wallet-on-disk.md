@@ -1,6 +1,6 @@
 # The wallet on disk
 
-Everything lives in two files in the storage directory:
+The money lives in two files in the storage directory:
 
 - `wallet.json` — proofs, mints, quotes, operations, history, the NUT-13 seed and its
   per-keyset counters. Plaintext, mode `0600`. **Not encrypted**: `cashme` is for small
@@ -9,7 +9,15 @@ Everything lives in two files in the storage directory:
 - `wallet.lock` — empty, and only there to be locked. One `cashme` may hold a wallet at a
   time; a second one is refused rather than allowed to overwrite the first one's proofs.
 
-The whole file is rewritten after every change, which a wallet this size can afford. Each
+One more file sits beside them, and holds no money:
+
+- `relays.json` — the nostr relays `zap` and `nutzap` ask, once this wallet has chosen its
+  own rather than the list built into the binary. Written by [`cashme relays`](relays.md),
+  and absent until something is changed there. Deleting it is `cashme relays --reset`. It is
+  outside `wallet.json` on purpose: it is not money, and `cashme zap` looks the recipient up
+  before it opens the wallet, so reading this must not take the wallet lock either.
+
+The whole wallet file is rewritten after every change, which a wallet this size can afford. Each
 write goes to `wallet.json.tmp`, is flushed to the disk, and is then renamed over the real
 file — so a crash leaves either the old wallet or the new one, never half of one, and never
 a rename pointing at bytes that never landed. A stray `wallet.json.tmp` is the remains of a

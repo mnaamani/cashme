@@ -17,6 +17,7 @@ Run `cashme <command> --help` for any command, or `cashme --help` for the full l
 - [ui](../../README.md) — the whole wallet on one screen, and what bare `cashme` runs
 - [balance](balance.md) — what this wallet can spend, per mint and in total
 - [mints](mints.md) — which mints this wallet trusts, and trusting or untrusting one
+- [relays](relays.md) — the nostr relays `zap` and `nutzap` ask, and adding or removing one
 - [deposit](deposit.md) — mint new ecash by paying a lightning invoice
 - [withdraw](withdraw.md) — melt ecash back into lightning sats
 - [give](give.md) — hand a token to a nearby device, or print it as text or a QR code
@@ -32,4 +33,4 @@ Run `cashme <command> --help` for any command, or `cashme --help` for the full l
 - [Global flags](global-flags.md) — the flags every command takes
 - [Where the traffic goes](where-the-traffic-goes.md) — what a mint, a relay or a proxy
   sees, and what `--proxy` and `--dht-interface` each cover
-- [The wallet on disk](wallet-on-disk.md) — the two files in the storage directory
+- [The wallet on disk](wallet-on-disk.md) — the files in the storage directory

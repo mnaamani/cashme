@@ -13,6 +13,7 @@ import {
   root,
   balance,
   mints,
+  relays,
   deposit,
   give,
   get,
@@ -30,6 +31,7 @@ import { configureNetwork, proxyFailure, proxyInForce, interfaceInForce } from '
 import { configureAddress } from './lib/cli/address.mjs'
 import { run as runBalance } from './lib/cli/balance.mjs'
 import { run as runMints } from './lib/cli/mints.mjs'
+import { run as runRelays } from './lib/cli/relays.mjs'
 import { run as runDeposit } from './lib/cli/deposit.mjs'
 import { run as runWithdraw } from './lib/cli/withdraw.mjs'
 import { run as runGive } from './lib/cli/give.mjs'
@@ -49,6 +51,7 @@ const debug = debuglog('cashme:app')
 const handlers = new Map([
   [balance.name, runBalance],
   [mints.name, runMints],
+  [relays.name, runRelays],
   [deposit.name, runDeposit],
   [withdraw.name, runWithdraw],
   [give.name, runGive],

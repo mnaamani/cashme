@@ -25,7 +25,8 @@ What happens on a run:
    still comes from the recipient's own signed event. Any relays the domain hints at are
    added to the lookup.
 2. Read the recipient's kind `10019` event from the relays — the mints they will redeem at,
-   the key to lock to, and the relays they read. `--relay` adds relays to query, repeatable.
+   the key to lock to, and the relays they read. `--relay` adds relays to query for this
+   run, repeatable, on top of the list in [`cashme relays`](relays.md).
    Every event a relay sends is checked against its own id and signature, and against the
    kind and author asked for, before any of it is believed: a relay that could forge a
    `10019` could name its own key as the one to lock the ecash to.

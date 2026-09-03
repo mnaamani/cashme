@@ -11,11 +11,20 @@ import { render } from '../lib/tui/runtime.mjs'
 import { App } from '../lib/tui/screens/app.mjs'
 import { FakeStdout, FakeStdin, settled } from '../lib/tui/testing.mjs'
 import { strip } from '../lib/tui/style.mjs'
+import { normalizeRelayUrl } from '../lib/relays.mjs'
+
+// Stands in for the relays built into the binary, which the screen shows until the list is
+// changed.
+const BUILT_IN_RELAYS = ['wss://relay.damus.io', 'wss://nos.lol']
 
 // A wallet that answers instantly and records what it was asked to do.
 function fakeApi(overrides = {}) {
   const calls = []
   const held = new Set()
+  // The relay list behaves as the file does: reads say where the list came from, and the
+  // first change makes it this wallet's own.
+  let relays = [...BUILT_IN_RELAYS]
+  let custom = false
   let address = 'ephemeral'
   const record =
     (name, result) =>
@@ -170,6 +179,26 @@ function fakeApi(overrides = {}) {
       return () => held.delete(entry)
     },
     holding: () => [...held],
+    relays: record('relays', () => ({ urls: [...relays], custom })),
+    addRelay: record('addRelay', (typed) => {
+      // The real one writes a url down one way however it was typed, and the screen shows
+      // what came back — so the fake normalizes too rather than echoing the keystrokes.
+      const url = normalizeRelayUrl(typed)
+      const added = !relays.includes(url)
+      if (added) relays.push(url)
+      custom = true
+      return { url, urls: [...relays], added }
+    }),
+    removeRelay: record('removeRelay', (url) => {
+      relays = relays.filter((entry) => entry !== url)
+      custom = true
+      return { url, urls: [...relays] }
+    }),
+    resetRelays: record('resetRelays', () => {
+      relays = [...BUILT_IN_RELAYS]
+      custom = false
+      return { urls: [...relays], custom }
+    }),
     ...overrides
   }
 }
@@ -178,6 +207,7 @@ function fakeApi(overrides = {}) {
 const ACTIONS = [
   'settings',
   'mints',
+  'relays',
   'in flight',
   'deposit',
   'give',
@@ -1601,6 +1631,95 @@ test('a wallet with nothing in it says so rather than showing an empty box', asy
 
   await ui.pick('mints')
   t.ok(ui.screen().includes('no mints yet'), 'the screen says there is nothing to show')
+
+  ui.app.unmount()
+})
+
+test("the relay screen says whether the list is this wallet's or the built-in one", async (t) => {
+  const ui = mount(fakeApi())
+  await ui.flush()
+
+  await ui.pick('relays')
+  for (const url of BUILT_IN_RELAYS) t.ok(ui.screen().includes(url), `${url} is on the list`)
+  t.ok(
+    ui.screen().includes('the relays built into this binary'),
+    'and the screen says nobody chose them'
+  )
+
+  ui.app.unmount()
+})
+
+test("A adds a relay, and the list becomes this wallet's own", async (t) => {
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('relays')
+  await ui.type('a')
+  // Typed rather than pressed: the letters of a relay url must not move the selection
+  // about while the field is open.
+  await ui.type('relay.example')
+  t.absent(
+    api.calls.some(([name]) => name === 'addRelay'),
+    'nothing is written while typing'
+  )
+
+  await ui.type('\r')
+  const call = api.calls.find(([name]) => name === 'addRelay')
+  t.is(call[1], 'relay.example', 'enter adds what was typed')
+  t.ok(ui.screen().includes('wss://relay.example'), 'and it appears on the list')
+  t.ok(ui.screen().includes("this wallet's own list"), 'which is now this wallet’s own')
+
+  ui.app.unmount()
+})
+
+test('X removes the selected relay, with nothing to confirm', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('relays')
+  t.ok(ui.screen().includes(`relays (${BUILT_IN_RELAYS.length})`), 'the list is the built-in one')
+
+  await ui.type('x')
+  const call = api.calls.find(([name]) => name === 'removeRelay')
+  t.is(call[1], BUILT_IN_RELAYS[0], 'the one the marker was on')
+  t.ok(ui.screen().includes(`relays (${BUILT_IN_RELAYS.length - 1})`), 'and it is off the list')
+  t.ok(ui.screen().includes(`removed ${BUILT_IN_RELAYS[0]}`), 'which the pane says, without asking')
+  t.ok(ui.screen().includes(BUILT_IN_RELAYS[1]), 'the rest are still standing')
+
+  ui.app.unmount()
+})
+
+test('B goes back to the built-in list, after asking', async (t) => {
+  const api = fakeApi()
+  const ui = mount(api)
+  await ui.flush()
+
+  await ui.pick('relays')
+  t.absent(ui.screen().includes('built into this binary?'), 'nothing to discard yet, so no B')
+
+  await ui.type('x') // now the list is this wallet's own
+  await ui.type('b')
+  t.ok(ui.screen().includes('built into this binary?'), 'B asks first')
+  t.absent(
+    api.calls.some(([name]) => name === 'resetRelays'),
+    'and nothing moves while it asks'
+  )
+
+  await ui.type('n')
+  t.absent(
+    api.calls.some(([name]) => name === 'resetRelays'),
+    'refusing keeps the list'
+  )
+
+  await ui.type('b')
+  await ui.type('y')
+  t.ok(
+    api.calls.some(([name]) => name === 'resetRelays'),
+    'accepting puts the built-in list back'
+  )
+  for (const url of BUILT_IN_RELAYS) t.ok(ui.screen().includes(url), `${url} is back`)
 
   ui.app.unmount()
 })

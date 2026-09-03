@@ -54,6 +54,7 @@ QR code, for you to carry across whatever channel you trust.
 ```sh
 cashme balance                                  # per mint and in total
 cashme mints                                    # which mints this wallet trusts
+cashme relays                                   # the nostr relays zap and nutzap ask
 cashme deposit --amount 100 --mint https://...  # mint ecash by paying a lightning invoice
 cashme withdraw --invoice lnbc...               # melt ecash back into lightning
 cashme get                                      # wait for a neighbour to pay you

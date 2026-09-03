@@ -26,9 +26,10 @@ What happens on a run:
 5. Pay that invoice exactly as `withdraw` does — same quote, same confirmation, same
    change and fee reporting. `--mint` picks which mint melts it, `--yes` skips the prompt.
 
-`--relay` adds relays to the profile lookup, repeatable. `--comment` rides along to the
-lnurl host and into the zap request, and `--event` tags the note being zapped, which is
-what puts the receipt under that note in a client rather than only on the recipient.
+`--relay` adds relays to the profile lookup for this run, repeatable, on top of the list in
+[`cashme relays`](relays.md). `--comment` rides along to the lnurl host and into the zap
+request, and `--event` tags the note being zapped, which is what puts the receipt under that
+note in a client rather than only on the recipient.
 
 The invoice the host returns is checked against the amount we asked for before anything is
 spent. Nothing about lnurl is signed, so a host that returns an invoice for some other
