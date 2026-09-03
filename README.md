@@ -10,23 +10,24 @@
 </p>
 
 <p align="center">
-  <b>Bearer ecash, handed from one device to another over the radio.</b><br>
+  <b>Bearer ecash, transfered peer-to-peer over the radio.</b><br>
   No account, no server in the middle, no permission asked.
 </p>
 
 <p align="center">
   <a href="#install">Install</a> ·
-  <a href="#the-wallet-on-one-screen">The UI</a> ·
-  <a href="#or-one-command-at-a-time">Commands</a> ·
+  <a href="#terminal-ui">The UI</a> ·
+  <a href="#commandline-interface">Commands</a> ·
   <a href="#docs">Docs</a>
 </p>
 
-> ### ⚠ EXPERIMENTAL — use at your own risk
->
-> cashme is made for educational, research and testing purposes only. Every mint is
-> custodial, ecash is bearer money, and this is a young wallet. Keep balances small.
+## Quickstart (Dev)
 
----
+```sh
+git clone https://github.com/mnaamani/cashme && cd cashme
+npm install
+npm start
+```
 
 ## Install
 
@@ -51,12 +52,11 @@ npm -g i pear
 pear install pear://tdnucsbcqeqer3yuyxduty4666zxr1f6ihua1j17g3pwr1qrnd9o
 ```
 
-Every route puts the same standalone binary in `~/.local/bin/cashme` and puts that directory on your PATH.
 Open a new terminal, then:
 
 ```sh
-cashme            # the whole wallet on one screen
-cashme --help     # or the list of commands, if you would rather type them
+cashme --version
+cashme --help
 ```
 
 The wallet keeps itself up to date in the background from its own pear link, so it never
@@ -65,15 +65,9 @@ for what each route does, pinning a version, and uninstalling.
 
 ---
 
-## The wallet on one screen
+## Terminal UI
 
-Run on its own, `cashme` opens a full-screen terminal UI. Balances, sends still in flight,
-and the deposit, give, get and withdraw flows, all in one place, updating as they happen.
-Piped or run from a script it prints the help instead, since there is no terminal to paint on.
-
-<p align="center">
-  <img src="docs/media/tui-splash.svg" alt="the cashme wordmark glitching in on start-up" width="720">
-</p>
+Simply running `cashme` without any command opens a full-screen terminal UI.
 
 <p align="center">
   <img src="docs/media/tui-menu.svg" alt="the cashme main menu: balance, and the ten things it can do" width="820">
@@ -92,12 +86,9 @@ Every action is a row on that list. Two of them:
 </tr>
 </table>
 
-> Every image above is generated from the UI itself by `npm run screenshots` — they are
-> painted frames, not photographs, so they cannot quietly go out of date.
-
 ---
 
-## Or one command at a time
+## Commandline interface
 
 ecash tokens are exchanged directly between two devices over Bluetooth Low Energy (BLE),
 the local network or the hyperdht, with no server in between — or handed over as text or a
@@ -147,3 +138,10 @@ everything in there travel with it, in
 shipped in every release archive. A pear install gets only the binary, so the same
 document is compiled into it and `cashme licenses` prints it. Nothing in the tree is
 copyleft.
+
+---
+
+> ### ⚠ EXPERIMENTAL — use at your own risk
+>
+> cashme is made for educational, research and testing purposes only. Every mint is
+> custodial, ecash is bearer money, and this is a young wallet. Keep balances small.
