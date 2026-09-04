@@ -1,5 +1,5 @@
 import test from 'brittle'
-import { MAX_TOKEN_BYTES, assertTokenSize, tokenQueue } from '../lib/token-wire.mjs'
+import { MAX_TOKEN_BYTES, assertTokenSize, tokenQueue, withTimeout } from '../lib/token-wire.mjs'
 
 test('a failed token receipt is rejected without poisoning the next receipt', async (t) => {
   const received = []
@@ -30,4 +30,25 @@ test('token input and pending receipts have finite limits', async (t) => {
   release()
   await first
   t.ok(queue.canReceive(), 'settling a receipt frees its slot')
+})
+
+test('a rejected operation clears its timeout', async (t) => {
+  const set = globalThis.setTimeout
+  const clear = globalThis.clearTimeout
+  const timer = { id: 'timer' }
+  let cleared = null
+  globalThis.setTimeout = () => timer
+  globalThis.clearTimeout = (value) => {
+    cleared = value
+  }
+  t.teardown(() => {
+    globalThis.setTimeout = set
+    globalThis.clearTimeout = clear
+  })
+
+  await t.exception(
+    withTimeout(Promise.reject(new Error('connection failed')), 5000, false),
+    /connection failed/
+  )
+  t.is(cleared, timer, 'the rejected operation does not leave a timer behind')
 })
