@@ -85,6 +85,7 @@ jobs:
         run: |
           docker run --detach --rm --name cashme-test-mint --publish 3338:3338 \
             --env CDK_MINTD_URL=http://127.0.0.1:3338 \
+            --env 'CDK_MINTD_MNEMONIC=abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about' \
             --env CDK_MINTD_LN_BACKEND=fakewallet \
             --env CDK_MINTD_DATABASE=sqlite \
             --env CDK_MINTD_CACHE_BACKEND=memory \
