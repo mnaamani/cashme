@@ -47,6 +47,23 @@ jobs:
       - name: Test
         run: npm test
 
+  packages:
+    name: Workspace packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Setup repo
+        uses: holepunchto/actions/.github/steps/setup-repo@v1
+
+      - name: Install w/ dev deps
+        run: npm install
+
+      - name: Install Bare
+        run: npm i -g bare-runtime
+
+      - name: Test workspace packages
+        run: npm run test:packages
+
   integration:
     name: Integration
     runs-on: ubuntu-latest
