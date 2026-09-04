@@ -78,7 +78,22 @@ jobs:
       - name: Install Bare
         run: npm i -g bare-runtime
 
-      # Spends at a real mint and talks to a local nostr relay. testnut issues ecash
-      # without a lightning payment, which is the only reason this can run unattended.
+      # The fake backend pays every invoice, keeping this independent from both a Lightning
+      # node and testnut.cashu.space, whose rolling deployment has made CI intermittent.
+      - name: Start test mint
+        run: |
+          docker run --detach --rm --name cashme-test-mint --publish 3338:3338 \
+            --env MINT_BACKEND_BOLT11_SAT=FakeWallet \
+            --env MINT_LISTEN_HOST=0.0.0.0 \
+            --env MINT_LISTEN_PORT=3338 \
+            --env MINT_PRIVATE_KEY=cashme-integration-test-key \
+            cashubtc/nutshell:0.20.3 poetry run mint
+          for attempt in {1..30}; do
+            curl --fail --silent http://127.0.0.1:3338/v1/info && exit 0
+            sleep 1
+          done
+          docker logs cashme-test-mint
+          exit 1
+
       - name: Test
-        run: npm run test:integration
+        run: CASHME_TEST_MINT=http://127.0.0.1:3338 npm run test:integration
