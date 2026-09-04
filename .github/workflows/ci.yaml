@@ -78,16 +78,19 @@ jobs:
       - name: Install Bare
         run: npm i -g bare-runtime
 
-      # The fake backend pays every invoice, keeping this independent from both a Lightning
-      # node and testnut.cashu.space, whose rolling deployment has made CI intermittent.
+      # Run the same CDK mint family as testnut, but pinned and local. Its fake backend pays
+      # every invoice, keeping CI independent from both a Lightning node and testnut's rolling
+      # deployment.
       - name: Start test mint
         run: |
           docker run --detach --rm --name cashme-test-mint --publish 3338:3338 \
-            --env MINT_BACKEND_BOLT11_SAT=FakeWallet \
-            --env MINT_LISTEN_HOST=0.0.0.0 \
-            --env MINT_LISTEN_PORT=3338 \
-            --env MINT_PRIVATE_KEY=cashme-integration-test-key \
-            cashubtc/nutshell:0.20.3 poetry run mint
+            --env CDK_MINTD_URL=http://127.0.0.1:3338 \
+            --env CDK_MINTD_LN_BACKEND=fakewallet \
+            --env CDK_MINTD_DATABASE=sqlite \
+            --env CDK_MINTD_CACHE_BACKEND=memory \
+            --env CDK_MINTD_LISTEN_HOST=0.0.0.0 \
+            --env CDK_MINTD_LISTEN_PORT=3338 \
+            cashubtc/mintd:0.17.1
           for attempt in {1..30}; do
             curl --fail --silent http://127.0.0.1:3338/v1/info && exit 0
             sleep 1
@@ -97,3 +100,7 @@ jobs:
 
       - name: Test
         run: CASHME_TEST_MINT=http://127.0.0.1:3338 npm run test:integration
+
+      - name: Show test mint logs
+        if: always()
+        run: docker logs cashme-test-mint
